@@ -1,35 +1,115 @@
+/usr/local/lib/python3.12/site-packages/paramiko/pkey.py:100: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "cipher": algorithms.TripleDES,
+/usr/local/lib/python3.12/site-packages/paramiko/transport.py:259: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "class": algorithms.TripleDES,
+[DEPRECATION WARNING]: ANSIBLE_COLLECTIONS_PATHS option, does not fit var 
+naming standard, use the singular form ANSIBLE_COLLECTIONS_PATH instead. This 
+feature will be removed from ansible-core in version 2.19. Deprecation warnings
+ can be disabled by setting deprecation_warnings=False in ansible.cfg.
+SSH password: 
+
+PLAY [Envanteri oku] ***********************************************************
+
+TASK [MySQL admin şifresi survey'den gelmiş olmalı] ****************************
+ok: [localhost]
+
+TASK [mysql_inventory : Survey girdisini doğrula (ortam seçimi)] ***************
+ok: [localhost]
+
+TASK [mysql_inventory : Satırları kaynaktan oku] *******************************
+[WARNING]: Collection community.general does not support Ansible version
+2.16.18
+included: /runner/project/MySQLUserDeploy/roles/mysql_inventory/tasks/fetch_mssql.yml for localhost
+
+TASK [mysql_inventory : MSSQL bağlantı bilgilerinin geldiğini doğrula] *********
+ok: [localhost]
+
+TASK [mysql_inventory : MSSQL envanter tablosunu oku (salt okunur SELECT)] *****
+ok: [localhost]
+
+TASK [mysql_inventory : Ham satırları ayıkla] **********************************
+ok: [localhost]
+
+TASK [mysql_inventory : Satırları normalize et] ********************************
+ok: [localhost]
+
+TASK [mysql_inventory : Hedefleri seç] *****************************************
+ok: [localhost]
+
+TASK [mysql_inventory : Sonuçları yayınla] *************************************
+ok: [localhost]
+
+TASK [mysql_inventory : Hedefleri dinamik gruplara ekle] ***********************
+ok: [localhost] => (item=gbarkt02 (TEST) ssh=10.230.109.104 mysql_port=3316)
+
+TASK [mysql_inventory : Hedef bulunamazsa job'ı anlaşılır mesajla durdur] ******
+skipping: [localhost]
+
+PLAY [Hedeflere bağlan] ********************************************************
+
+TASK [mysql_connectivity : 1/4 SSH bağlantısı] *********************************
+ok: [gbarkt02]
+
+TASK [mysql_connectivity : 2/4 mysql client'ı bul (login shell PATH + bilinen yollar)] ***
+ok: [gbarkt02]
+
+TASK [mysql_connectivity : Geçici client option file oluştur] ******************
+ok: [gbarkt02]
+
+TASK [mysql_connectivity : Kimlik bilgisini option file'a yaz] *****************
+ok: [gbarkt02]
+
+TASK [mysql_connectivity : TCP ile bağlan (127.0.0.1:3316)] ********************
+ok: [gbarkt02]
+
+TASK [mysql_connectivity : Socket ile bağlan (socket modu veya TCP auth/port hatası)] ***
+skipping: [gbarkt02]
+
+TASK [mysql_connectivity : Geçici option file'ı sil] ***************************
+ok: [gbarkt02]
+
+TASK [mysql_connectivity : 4/4 Sonucu sınıflandır] *****************************
+ok: [gbarkt02]
+
+PLAY [Rapor] *******************************************************************
+
+TASK [mysql_report : Rapor satırlarını oluştur] ********************************
+ok: [localhost]
+
+TASK [mysql_report : Özet hesapla] *********************************************
+ok: [localhost]
+
+TASK [mysql_report : Rapor tablosu] ********************************************
 ok: [localhost] => {
-    "mysqlinv_summary": {
-        "rows_read": "63",
-        "selected_environments": [
+    "msg": [
+        "SERVER   | ENVIRONMENT | IP             | PORT | STATUS | METHOD | VERSION | DETAIL",
+        "---------+-------------+----------------+------+--------+--------+---------+-------",
+        "gbarkt02 | TEST        | 10.230.109.104 | 3316 | OK     | tcp    | 8.0.36  |       "
+    ]
+}
+
+TASK [mysql_report : Rapor özeti] **********************************************
+ok: [localhost] => {
+    "mysqlreport_summary": {
+        "by_status": {
+            "OK": 1
+        },
+        "environments": [
             "TEST"
         ],
-        "server_filter": [
-            "\"\""
-        ],
-        "skipped_count": "0",
-        "source": "PGARSQLTEM01,1453/MysqlInventory",
-        "target_count": "0",
-        "targets_per_env": {
-            "TEST": 0
-        },
-        "type_values_found": [
-            "Dev",
-            "Production",
-            "QA",
-            "Test"
-        ],
-        "unmapped_type_values": []
+        "failed_servers": [],
+        "title": "Faz 2 - MySQL bağlantı raporu",
+        "total_targets": "1",
+        "warning_servers": []
     }
 }
-TASK [Elenen kayıtlar] *********************************************************
-skipping: [localhost]
-TASK [Eşlenmemiş Type değeri uyarısı] ******************************************
-skipping: [localhost]
-TASK [Rapor verisini AAP job artifact'ına yaz (workflow'larda sonraki adıma geçer)] ***
+
+TASK [mysql_report : Raporu AAP job artifact'ına yaz] **************************
 ok: [localhost]
-[WARNING]: Could not match supplied host pattern, ignoring: mysql_targets
-PLAY [Dinamik grubun oluştuğunu doğrula] ***************************************
-skipping: no hosts matched
+
+TASK [mysql_report : Başarısız sunucu varsa job'ı FAILED işaretle] *************
+skipping: [localhost]
+
 PLAY RECAP *********************************************************************
-localhost                  : ok=10   changed=0    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+gbarkt02                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+localhost                  : ok=15   changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
