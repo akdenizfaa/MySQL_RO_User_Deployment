@@ -1,0 +1,340 @@
+/usr/local/lib/python3.12/site-packages/paramiko/pkey.py:100: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "cipher": algorithms.TripleDES,
+/usr/local/lib/python3.12/site-packages/paramiko/transport.py:259: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "class": algorithms.TripleDES,
+[DEPRECATION WARNING]: ANSIBLE_COLLECTIONS_PATHS option, does not fit var 
+naming standard, use the singular form ANSIBLE_COLLECTIONS_PATH instead. This 
+feature will be removed from ansible-core in version 2.19. Deprecation warnings
+ can be disabled by setting deprecation_warnings=False in ansible.cfg.
+SSH password: 
+
+PLAY [Girdileri doğrula ve envanteri oku] **************************************
+
+TASK [MySQL admin şifresi survey'den gelmiş olmalı] ****************************
+ok: [localhost]
+
+TASK [Çalışma modu] ************************************************************
+ok: [localhost] => {
+    "msg": "RUN - plan uygulanacak"
+}
+
+TASK [Hedef kullanıcı girdileri] ***********************************************
+
+TASK [mysql_user_check : Hedef kullanıcı girdilerini doğrula] ******************
+ok: [localhost]
+
+TASK [mysql_user_check : Doğrulanan girdiler] **********************************
+ok: [localhost] => {
+    "msg": {
+        "desired": {
+            "all": false,
+            "grant_option": false,
+            "privileges": [
+                "CREATE",
+                "ALTER",
+                "DROP",
+                "INDEX",
+                "REFERENCES",
+                "CREATE VIEW",
+                "SHOW VIEW",
+                "CREATE ROUTINE",
+                "ALTER ROUTINE",
+                "TRIGGER",
+                "EVENT"
+            ]
+        },
+        "hosts": [
+            "%"
+        ],
+        "password_mismatch_action": "report",
+        "privilege_sets": [
+            "ddl"
+        ],
+        "user": "pmysqlmetadata_app"
+    }
+}
+
+TASK [mysql_inventory : Survey girdisini doğrula (ortam seçimi)] ***************
+ok: [localhost]
+
+TASK [mysql_inventory : Satırları kaynaktan oku] *******************************
+[WARNING]: Collection community.general does not support Ansible version
+2.16.18
+included: /runner/project/MySQLUserDeploy/roles/mysql_inventory/tasks/fetch_mssql.yml for localhost
+
+TASK [mysql_inventory : MSSQL bağlantı bilgilerinin geldiğini doğrula] *********
+ok: [localhost]
+
+TASK [mysql_inventory : MSSQL envanter tablosunu oku (salt okunur SELECT)] *****
+ok: [localhost]
+
+TASK [mysql_inventory : Ham satırları ayıkla] **********************************
+ok: [localhost]
+
+TASK [mysql_inventory : Satırları normalize et] ********************************
+ok: [localhost]
+
+TASK [mysql_inventory : Hedefleri seç] *****************************************
+ok: [localhost]
+
+TASK [mysql_inventory : Sonuçları yayınla] *************************************
+ok: [localhost]
+
+TASK [mysql_inventory : Hedefleri dinamik gruplara ekle] ***********************
+ok: [localhost] => (item=gbadbt01 (TEST) ssh=10.230.169.13 mysql_port=3316)
+
+TASK [mysql_inventory : Hedef bulunamazsa job'ı anlaşılır mesajla durdur] ******
+skipping: [localhost]
+
+PLAY [Bağlan, kontrol et, uygula, doğrula] *************************************
+
+TASK [mysql_connectivity : 1/4 SSH bağlantısı] *********************************
+ok: [gbadbt01]
+
+TASK [mysql_connectivity : 2/4 mysql client'ı bul (login shell PATH + bilinen yollar)] ***
+ok: [gbadbt01]
+
+TASK [mysql_connectivity : Geçici client option file oluştur] ******************
+ok: [gbadbt01]
+
+TASK [mysql_connectivity : Kimlik bilgisini option file'a yaz] *****************
+ok: [gbadbt01]
+
+TASK [mysql_connectivity : TCP ile bağlan (127.0.0.1:3316)] ********************
+ok: [gbadbt01]
+
+TASK [mysql_connectivity : Socket ile bağlan (socket modu veya TCP auth/port hatası)] ***
+skipping: [gbadbt01]
+
+TASK [mysql_connectivity : Geçici option file'ı sil] ***************************
+ok: [gbadbt01]
+
+TASK [mysql_connectivity : 4/4 Sonucu sınıflandır] *****************************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Girdileri localhost'tan al] ***************************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Bağlantı OK değilse kontrolü atla] ********************
+skipping: [gbadbt01]
+
+TASK [mysql_user_check : MySQL bağlantı argümanlarını hazırla (Faz 2'de çalışan yöntem)] ***
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Geçici client option file oluştur] ********************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Kimlik bilgisini option file'a yaz] *******************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Hedef kullanıcının hesaplarını ve native password hesaplarını oku] ***
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Mevcut hesapları ayrıştır] ****************************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Mevcut hesapların yetkilerini oku (SHOW GRANTS)] ******
+skipping: [gbadbt01]
+
+TASK [mysql_user_check : Geçici option file'ı sil] *****************************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Sorgu hatasını kaydet] ********************************
+skipping: [gbadbt01]
+
+TASK [mysql_user_check : Hesapları değerlendir (şifre hash karşılaştırma controller'da)] ***
+ok: [gbadbt01]
+
+TASK [mysql_user_apply : Uygulanacak planı hazırla] ****************************
+ok: [gbadbt01]
+
+TASK [mysql_user_apply : Uygulanamayan durumları kaydet] ***********************
+skipping: [gbadbt01]
+
+TASK [mysql_user_apply : Bağlantı argümanlarını hazırla] ***********************
+ok: [gbadbt01]
+
+TASK [mysql_user_apply : Geçici client option file oluştur] ********************
+ok: [gbadbt01]
+
+TASK [mysql_user_apply : Kimlik bilgisini option file'a yaz] *******************
+ok: [gbadbt01]
+
+TASK [mysql_user_apply : SQL ifadelerini çalıştır (2 ifade)] *******************
+ok: [gbadbt01]
+
+TASK [mysql_user_apply : Geçici option file'ı sil] *****************************
+ok: [gbadbt01]
+
+TASK [mysql_user_apply : Uygulama sonucunu kaydet] *****************************
+ok: [gbadbt01]
+
+TASK [Uygulama sonrası doğrulama] **********************************************
+
+TASK [mysql_user_check : Girdileri localhost'tan al] ***************************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Bağlantı OK değilse kontrolü atla] ********************
+skipping: [gbadbt01]
+
+TASK [mysql_user_check : MySQL bağlantı argümanlarını hazırla (Faz 2'de çalışan yöntem)] ***
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Geçici client option file oluştur] ********************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Kimlik bilgisini option file'a yaz] *******************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Hedef kullanıcının hesaplarını ve native password hesaplarını oku] ***
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Mevcut hesapları ayrıştır] ****************************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Mevcut hesapların yetkilerini oku (SHOW GRANTS)] ******
+skipping: [gbadbt01]
+
+TASK [mysql_user_check : Geçici option file'ı sil] *****************************
+ok: [gbadbt01]
+
+TASK [mysql_user_check : Sorgu hatasını kaydet] ********************************
+skipping: [gbadbt01]
+
+TASK [mysql_user_check : Hesapları değerlendir (şifre hash karşılaştırma controller'da)] ***
+ok: [gbadbt01]
+
+TASK [mysql_user_apply : Doğrulamanın çalıştığını işaretle] ********************
+ok: [gbadbt01]
+
+PLAY [Rapor] *******************************************************************
+
+TASK [mysql_report : Rapor satırlarını oluştur] ********************************
+ok: [localhost]
+
+TASK [mysql_report : Özet hesapla] *********************************************
+ok: [localhost]
+
+TASK [mysql_report : Rapor tablosu] ********************************************
+ok: [localhost] => {
+    "msg": [
+        "SERVER   | ENVIRONMENT | IP            | PORT | STATUS | METHOD | VERSION | DETAIL",
+        "---------+-------------+---------------+------+--------+--------+---------+-------",
+        "gbadbt01 | TEST        | 10.230.169.13 | 3316 | OK     | tcp    | 8.4.5   |       "
+    ]
+}
+
+TASK [mysql_report : Rapor özeti] **********************************************
+ok: [localhost] => {
+    "mysqlreport_summary": {
+        "by_status": {
+            "OK": 1
+        },
+        "environments": [
+            "TEST"
+        ],
+        "failed_servers": [],
+        "title": "Faz 4 - MySQL kullanıcı dağıtım raporu",
+        "total_targets": "1",
+        "warning_servers": []
+    }
+}
+
+TASK [mysql_report : Hesap satırlarını oluştur] ********************************
+ok: [localhost]
+
+TASK [mysql_report : Hesap tablosu] ********************************************
+ok: [localhost] => {
+    "msg": [
+        "SERVER   | ENVIRONMENT | ACCOUNT              | STATUS     | PLUGIN | PASSWORD | MISSING                                                                                                       | EXTRA | FLAGS | PLANNED                                                                                                                  | APPLY  | POST                                                                                                                    ",
+        "---------+-------------+----------------------+------------+--------+----------+---------------------------------------------------------------------------------------------------------------+-------+-------+--------------------------------------------------------------------------------------------------------------------------+--------+-------------------------------------------------------------------------------------------------------------------------",
+        "gbadbt01 | TEST        | pmysqlmetadata_app@% | NOT_EXISTS |        |          | CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, TRIGGER, EVENT |       |       | CREATE USER 'pmysqlmetadata_app'@'%' IDENTIFIED WITH caching_sha2_password BY '********'; GRANT CREATE, ALTER, DROP, IND | FAILED | NOT_EXISTS (eksik: CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, TRIGGE"
+    ]
+}
+
+TASK [mysql_report : Audit - mysql_native_password kullanan hesaplar (düzeltilmeli)] ***
+ok: [localhost] => {
+    "msg": [
+        "(kayıt yok)"
+    ]
+}
+
+TASK [mysql_report : Hesap özetini hesapla] ************************************
+ok: [localhost]
+
+TASK [mysql_report : Hesap özeti] **********************************************
+ok: [localhost] => {
+    "mysqlreport_summary": {
+        "accounts_by_status": {
+            "NOT_EXISTS": 1
+        },
+        "by_status": {
+            "OK": 1
+        },
+        "environments": [
+            "TEST"
+        ],
+        "failed_servers": [],
+        "native_password_account_count": 0,
+        "native_password_by_category": {},
+        "native_password_servers": [],
+        "title": "Faz 4 - MySQL kullanıcı dağıtım raporu",
+        "total_targets": "1",
+        "warning_servers": []
+    }
+}
+
+TASK [mysql_report : İfade bazlı sonuçları oluştur] ****************************
+ok: [localhost]
+
+TASK [mysql_report : Uygulama tablosu (SQL maskeli)] ***************************
+ok: [localhost] => {
+    "msg": [
+        "SERVER   | ENVIRONMENT | ACCOUNT              | STATEMENT                                                                                                                | RESULT  | ERROR                                                                     ",
+        "---------+-------------+----------------------+--------------------------------------------------------------------------------------------------------------------------+---------+---------------------------------------------------------------------------",
+        "gbadbt01 | TEST        | pmysqlmetadata_app@% | CREATE USER 'pmysqlmetadata_app'@'%' IDENTIFIED WITH caching_sha2_password BY '********'                                 | FAILED  | ERROR 1819: Your password does not satisfy the current policy requirements",
+        "gbadbt01 | TEST        | pmysqlmetadata_app@% | GRANT CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, TRIGGER, EVENT ON * | NOT_RUN |                                                                           "
+    ]
+}
+
+TASK [mysql_report : Uygulama özetini ekle] ************************************
+ok: [localhost]
+
+TASK [mysql_report : Uygulama özeti] *******************************************
+ok: [localhost] => {
+    "mysqlreport_summary": {
+        "accounts_by_status": {
+            "NOT_EXISTS": 1
+        },
+        "by_status": {
+            "OK": 1
+        },
+        "environments": [
+            "TEST"
+        ],
+        "failed_servers": [
+            "gbadbt01"
+        ],
+        "mode": "RUN",
+        "native_password_account_count": 0,
+        "native_password_by_category": {},
+        "native_password_servers": [],
+        "statements_by_result": {
+            "FAILED": 1,
+            "NOT_RUN": 1
+        },
+        "title": "Faz 4 - MySQL kullanıcı dağıtım raporu",
+        "total_targets": "1",
+        "warning_servers": []
+    }
+}
+
+TASK [mysql_report : Raporu AAP job artifact'ına yaz] **************************
+ok: [localhost]
+
+TASK [mysql_report : Başarısız sunucu varsa job'ı FAILED işaretle] *************
+fatal: [localhost]: FAILED! => {"changed": false, "msg": "1 sunucuda hata var: gbadbt01. Ayrıntı yukarıdaki tabloda."}
+
+PLAY RECAP *********************************************************************
+gbadbt01                   : ok=31   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+localhost                  : ok=27   changed=0    unreachable=0    failed=1    skipped=1    rescued=0    ignored=0   
