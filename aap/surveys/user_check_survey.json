@@ -1,0 +1,120 @@
+{
+  "name": "MySQL User Check",
+  "description": "Faz 3 - Kullanıcı var mı / şifre aynı mı / yetki farkı + native password audit (değişiklik yapmaz)",
+  "spec": [
+    {
+      "question_name": "Ortam(lar)",
+      "question_description": "Hedeflenecek ortamlar (çoklu seçim)",
+      "variable": "target_environments",
+      "type": "multiselect",
+      "choices": "DEV\nTEST\nQA\nPROD",
+      "default": "TEST",
+      "required": true
+    },
+    {
+      "question_name": "Sunucu filtresi (opsiyonel)",
+      "question_description": "Virgülle ayrılmış ServerName listesi. BOŞ BIRAKIN = seçilen ortamdaki tüm aktif sunucular (tırnak yazmayın)",
+      "variable": "target_servers",
+      "type": "text",
+      "default": "",
+      "required": false,
+      "min": 0,
+      "max": 4000
+    },
+    {
+      "question_name": "MSSQL kullanıcısı",
+      "question_description": "PGARSQLTEM01,1453 / MysqlInventory",
+      "variable": "mssql_user",
+      "type": "text",
+      "default": "Sql_inventory_user",
+      "required": true,
+      "min": 1,
+      "max": 128
+    },
+    {
+      "question_name": "MSSQL şifresi",
+      "variable": "mssql_password",
+      "type": "password",
+      "default": "",
+      "required": true,
+      "min": 1,
+      "max": 256
+    },
+    {
+      "question_name": "MySQL admin kullanıcısı",
+      "variable": "mysql_admin_user",
+      "type": "text",
+      "default": "root",
+      "required": true,
+      "min": 1,
+      "max": 64
+    },
+    {
+      "question_name": "MySQL admin şifresi",
+      "question_description": "Sunucuya geçici 0600 dosya ile aktarılır, komut satırında görünmez, iş sonunda silinir",
+      "variable": "mysql_admin_password",
+      "type": "password",
+      "default": "",
+      "required": true,
+      "min": 1,
+      "max": 256
+    },
+    {
+      "question_name": "MySQL bağlantı yöntemi",
+      "question_description": "auto: önce TCP 127.0.0.1:<port>, auth/port hatasında socket | tcp: sadece TCP | socket: sadece socket",
+      "variable": "mysql_connect_method",
+      "type": "multiplechoice",
+      "choices": "auto\ntcp\nsocket",
+      "default": "auto",
+      "required": true
+    },
+    {
+      "question_name": "Hedef kullanıcı adı",
+      "question_description": "Oluşturulacak/kontrol edilecek MySQL kullanıcısı (harf, rakam, _ . -, en fazla 32)",
+      "variable": "target_user",
+      "type": "text",
+      "default": "",
+      "required": true,
+      "min": 1,
+      "max": 32
+    },
+    {
+      "question_name": "Hedef kullanıcı şifresi",
+      "question_description": "MySQL sunucularına gönderilmez; mevcut hash ile AAP içinde karşılaştırılır",
+      "variable": "target_user_password",
+      "type": "password",
+      "default": "",
+      "required": true,
+      "min": 1,
+      "max": 256
+    },
+    {
+      "question_name": "Kullanıcı host(ları)",
+      "question_description": "Virgülle ayrılmış. % = her yerden. Örn: 10.230.%,10.236.%",
+      "variable": "target_user_hosts",
+      "type": "text",
+      "default": "%",
+      "required": true,
+      "min": 1,
+      "max": 1000
+    },
+    {
+      "question_name": "Yetki setleri",
+      "question_description": "readonly: SELECT, SHOW VIEW | dml: SELECT, INSERT, UPDATE, DELETE, LOCK TABLES, CREATE TEMPORARY TABLES | ddl: CREATE, ALTER, DROP, INDEX, ... | superuser: ALL | superuser_with_grant: ALL + GRANT OPTION",
+      "variable": "privilege_sets",
+      "type": "multiselect",
+      "choices": "readonly\ndml\nddl\nsuperuser\nsuperuser_with_grant",
+      "default": "readonly",
+      "required": true
+    },
+    {
+      "question_name": "Şifre farklıysa",
+      "question_description": "report: sadece raporla | update: şifreyi güncelle (Faz 3'te yalnızca planlanır, uygulanmaz)",
+      "variable": "password_mismatch_action",
+      "type": "multiplechoice",
+      "choices": "report\nupdate",
+      "default": "report",
+      "required": true
+    }
+  ]
+}

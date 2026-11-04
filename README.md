@@ -24,10 +24,13 @@ execution-environment/                # ansible-builder tanımı (pymssql)
 inventory/localhost.yml               # sadece controller; hedefler runtime'da eklenir
 inventory_read.yml                    # FAZ 1: envanter keşfi
 connectivity_check.yml                # FAZ 2: SSH + MySQL bağlantı testi ve rapor
+user_check.yml                        # FAZ 3: kullanıcı/şifre/yetki kontrolü + native password audit
 roles/mysql_inventory/                # MSSQL okuma + ortam eşleme + add_host
   filter_plugins/mysqlinv.py
 roles/mysql_connectivity/             # host başına SSH/client/MySQL testi
   filter_plugins/mysqlconn.py         # durum sınıflandırma + option file üretimi
+roles/mysql_user_check/               # hesap okuma, hash karşılaştırma, yetki farkı
+  filter_plugins/mysqluser.py
 roles/mysql_report/                   # konsolide tablo + özet + set_stats
   filter_plugins/mysqlreport.py
 aap/surveys/                          # Survey spec (JSON)
@@ -89,8 +92,49 @@ Güvenlik: root şifresi komut satırında geçmez (`ps` ile görünmez). Sunucu
 `/tmp` altında 0600 izinli geçici bir option file oluşturulur, iş bitince her
 durumda (hata olsa da) silinir. İlgili task `no_log: true`.
 
+## Faz 3 – Kullanıcı kontrolü ve audit (değişiklik yapmaz)
+
+Job Template: `MySQL - User Check`
+- Playbook: `user_check.yml`, Credential: **SSH:uxsqlteam**, EE: Faz 1 ile aynı
+- Survey: `aap/surveys/user_check_survey.json` (12 soru)
+
+Yetki setleri (hepsi `*.*`, çoklu seçimde birleşim):
+
+| Set | Yetkiler |
+|---|---|
+| readonly | SELECT, SHOW VIEW |
+| dml | SELECT, INSERT, UPDATE, DELETE, LOCK TABLES, CREATE TEMPORARY TABLES |
+| ddl | CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, TRIGGER, EVENT |
+| superuser | ALL PRIVILEGES |
+| superuser_with_grant | ALL PRIVILEGES WITH GRANT OPTION |
+
+**Şifre kontrolü:** hedef kullanıcının şifresi MySQL sunucularına gönderilmez.
+`mysql.user`'dan `plugin` ve `HEX(authentication_string)` okunur; survey'deki
+şifre aynı algoritma + salt ile AAP içinde hash'lenip karşılaştırılır
+(`mysql_native_password`: SHA1(SHA1); `caching_sha2_password`: SHA-256 crypt, 5000 tur).
+Algoritma gerçek MySQL 8.0.46 hash'leriyle doğrulanmıştır (`tests/fixtures/mysql8_hash_vectors.json`).
+
+Hesap durumları (her `'user'@'host'` için):
+
+| Durum | Anlamı | Planlanan işlem (Faz 4) |
+|---|---|---|
+| `NOT_EXISTS` | Hesap yok | CREATE USER + GRANT |
+| `EXISTS_PASSWORD_MATCH` | Var, şifre aynı | Eksik yetki varsa GRANT |
+| `EXISTS_PASSWORD_DIFFERENT` | Var, şifre farklı | `report`: yok / `update`: ALTER USER |
+| `UNSUPPORTED_PLUGIN` | auth_socket vb., şifre kontrol edilemez | — |
+| `EXTRA_ACCOUNT` | Aynı kullanıcı, survey'de olmayan host | Bilgi |
+| `SKIPPED_CONNECTION` / `QUERY_ERROR` | Bağlantı/sorgu sorunu | — |
+
+İşaretler: `NATIVE_PASSWORD_DÜZELTİLMELİ`, `ACCOUNT_LOCKED`, `PASSWORD_EXPIRED`,
+`MEVCUT_GRANT_OPTION` (istenmediği halde var; Faz 4 yetki geri almaz).
+
+**Audit:** her sunucudaki tüm `mysql_native_password` hesapları ayrı tabloda
+"düzeltilmeli" olarak listelenir (8.4'te bu plugin varsayılan olarak kapalıdır).
+
 ## Sorun giderme
 
+- **Socket ile bağlantı `MYSQL_UNREACHABLE` (ERROR 2002 ... (13))**: `uxsqlteam`
+  socket dizinine (örn. `/var/run/mysqld`) erişemiyor; dizin izni 755 olmalı veya TCP girişi açılmalı.
 - **Hedef sayısı 0 / "Seçilen kriterlere uyan hedef sunucu yok"**: Sunucu filtresi
   alanına tırnak (`""`) yazmayın, boş bırakın. Envanterde olmayan adlar
   `server_filter_not_found` alanında listelenir.

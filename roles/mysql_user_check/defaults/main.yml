@@ -1,0 +1,7 @@
+---
+# Survey girdileri
+target_user: ""                     # oluşturulacak/kontrol edilecek kullanıcı adı
+target_user_password: ""            # password tipi; sunucuya GÖNDERİLMEZ (hash AAP'de karşılaştırılır)
+target_user_hosts: "%"              # virgülle: "%" veya "10.230.%,10.236.%"
+privilege_sets: []                  # readonly, dml, ddl, superuser, superuser_with_grant
+password_mismatch_action: report    # report | update (Faz 3 yalnız planlar, uygulamaz)

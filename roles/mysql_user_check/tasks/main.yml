@@ -1,0 +1,110 @@
+---
+# Hedef host başına; yalnızca Faz 2 bağlantı testi OK olan sunucularda çalışır.
+# SALT OKUNUR: sadece SELECT ve SHOW GRANTS. Hedef kullanıcının şifresi sunucuya
+# gönderilmez; karşılaştırma controller'da (EE) yapılır.
+# Çıktı (host fact): mysqluser = {status, accounts[], native_password_accounts[], detail}
+
+- name: Girdileri localhost'tan al
+  ansible.builtin.set_fact:
+    _mu_inputs: "{{ hostvars['localhost']['mysqluser_inputs'] }}"
+
+- name: Bağlantı OK değilse kontrolü atla
+  ansible.builtin.set_fact:
+    mysqluser:
+      status: "SKIPPED_CONNECTION"
+      detail: "Bağlantı durumu {{ mysqlconn.status | default('?') }}"
+      accounts: []
+      native_password_accounts: []
+  when: (mysqlconn.status | default('')) != 'OK'
+
+- name: Hesapları ve yetkileri oku
+  when: (mysqlconn.status | default('')) == 'OK'
+  block:
+    - name: MySQL bağlantı argümanlarını hazırla (Faz 2'de çalışan yöntem)
+      ansible.builtin.set_fact:
+        _mu_conn_args: >-
+          {{ ['--protocol=TCP', '--host=127.0.0.1', '--port=' ~ mysql_port]
+             if mysqlconn.method == 'tcp' else ['--protocol=SOCKET'] }}
+
+    - name: Geçici client option file oluştur
+      ansible.builtin.tempfile:
+        state: file
+        path: "{{ mysql_tmp_dir | default('/tmp') }}"
+        prefix: ".ans_mycnf_"
+      register: _mu_cnf
+      changed_when: false
+      check_mode: false
+
+    - name: Kimlik bilgisini option file'a yaz
+      ansible.builtin.copy:
+        dest: "{{ _mu_cnf.path }}"
+        mode: "0600"
+        content: "{{ mysql_admin_password | mysqlconn_cnf(mysql_admin_user) }}"
+      no_log: true
+      changed_when: false
+      check_mode: false
+
+    - name: Hedef kullanıcının hesaplarını ve native password hesaplarını oku
+      ansible.builtin.command:
+        argv: >-
+          {{ [mysqlconn.client, '--defaults-extra-file=' ~ _mu_cnf.path]
+             + _mu_conn_args
+             + ['--batch', '--skip-column-names', '--default-character-set=utf8mb4',
+                '--execute=' ~ (_mu_inputs.user | mysqluser_account_sql)] }}
+      register: _mu_accounts
+      failed_when: false
+      changed_when: false
+      check_mode: false
+
+    - name: Mevcut hesapları ayrıştır
+      ansible.builtin.set_fact:
+        _mu_parsed: "{{ _mu_accounts.stdout | mysqluser_parse_accounts }}"
+      when: _mu_accounts.rc == 0
+
+    - name: Mevcut hesapların yetkilerini oku (SHOW GRANTS)
+      ansible.builtin.command:
+        argv: >-
+          {{ [mysqlconn.client, '--defaults-extra-file=' ~ _mu_cnf.path]
+             + _mu_conn_args
+             + ['--batch', '--skip-column-names', '--default-character-set=utf8mb4',
+                '--execute=' ~ (_mu_parsed.accounts | mysqluser_grants_sql)] }}
+      register: _mu_grants
+      failed_when: false
+      changed_when: false
+      check_mode: false
+      when:
+        - _mu_accounts.rc == 0
+        - _mu_parsed.accounts | length > 0
+
+  always:
+    - name: Geçici option file'ı sil
+      ansible.builtin.file:
+        path: "{{ _mu_cnf.path }}"
+        state: absent
+      changed_when: false
+      check_mode: false
+      when: _mu_cnf.path is defined
+
+- name: Sorgu hatasını kaydet
+  ansible.builtin.set_fact:
+    mysqluser:
+      status: "QUERY_ERROR"
+      detail: "{{ (_mu_accounts.stderr | default('') ~ ' ' ~ (_mu_grants.stderr | default(''))) | trim | truncate(300) }}"
+      accounts: []
+      native_password_accounts: []
+  when:
+    - (mysqlconn.status | default('')) == 'OK'
+    - (_mu_accounts.rc | default(1)) != 0 or (_mu_grants.rc | default(0)) != 0
+
+- name: Hesapları değerlendir (şifre hash karşılaştırma controller'da)
+  ansible.builtin.set_fact:
+    mysqluser: >-
+      {{ {'status': 'CHECKED', 'detail': ''}
+         | combine(_mu_inputs | mysqluser_evaluate(
+                     _mu_parsed,
+                     (_mu_grants.stdout | default('')) | mysqluser_parse_grants,
+                     target_user_password)) }}
+  when:
+    - (mysqlconn.status | default('')) == 'OK'
+    - (_mu_accounts.rc | default(1)) == 0
+    - (_mu_grants.rc | default(0)) == 0

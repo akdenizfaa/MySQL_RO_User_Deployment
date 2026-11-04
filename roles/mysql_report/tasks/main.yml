@@ -19,17 +19,52 @@
 
 - name: Rapor tablosu
   ansible.builtin.debug:
-    msg: "{{ (mysqlreport_data | mysqlreport_table).split('\n') }}"
+    msg: "{{ mysqlreport_data | mysqlreport_lines }}"
 
 - name: Rapor özeti
   ansible.builtin.debug:
     var: mysqlreport_summary
+
+- name: Hesap raporu (Faz 3)
+  when: mysqlreport_include_accounts | bool
+  block:
+    - name: Hesap satırlarını oluştur
+      ansible.builtin.set_fact:
+        mysqlreport_accounts: "{{ groups['mysql_targets'] | default([]) | mysqlreport_account_rows(hostvars) }}"
+        mysqlreport_native: "{{ groups['mysql_targets'] | default([]) | mysqlreport_native_rows(hostvars) }}"
+
+    - name: Hesap tablosu
+      ansible.builtin.debug:
+        msg: >-
+          {{ mysqlreport_accounts | mysqlreport_lines(['server', 'environment', 'account', 'status',
+              'plugin', 'password', 'missing', 'flags', 'planned']) }}
+
+    - name: Audit - mysql_native_password kullanan hesaplar (düzeltilmeli)
+      ansible.builtin.debug:
+        msg: "{{ mysqlreport_native | mysqlreport_lines(['server', 'environment', 'account', 'issue']) }}"
+
+    - name: Hesap özetini hesapla
+      ansible.builtin.set_fact:
+        mysqlreport_summary: >-
+          {{ mysqlreport_summary | combine({
+               'accounts_by_status': mysqlreport_accounts | mysqlreport_counts,
+               'native_password_account_count': mysqlreport_native | length,
+               'native_password_servers': mysqlreport_native | map(attribute='server') | unique | list,
+               'failed_servers': (mysqlreport_summary.failed_servers
+                                  + (mysqlreport_accounts | selectattr('status', 'eq', 'QUERY_ERROR')
+                                     | map(attribute='server') | list)) | unique | list }) }}
+
+    - name: Hesap özeti
+      ansible.builtin.debug:
+        var: mysqlreport_summary
 
 - name: Raporu AAP job artifact'ına yaz
   ansible.builtin.set_stats:
     data:
       mysqlreport_summary: "{{ mysqlreport_summary }}"
       mysqlreport_data: "{{ mysqlreport_data }}"
+      mysqlreport_accounts: "{{ mysqlreport_accounts | default([]) }}"
+      mysqlreport_native: "{{ mysqlreport_native | default([]) }}"
     per_host: false
 
 - name: Başarısız sunucu varsa job'ı FAILED işaretle

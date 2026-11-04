@@ -31,6 +31,37 @@ def mysqlreport_rows(hostnames, hostvars, skipped=None, result_var="mysqlconn"):
     return rows
 
 
+def mysqlreport_account_rows(hostnames, hostvars, result_var="mysqluser"):
+    """Faz 3: sunucu x hesap satırları. Bağlantısı olmayan sunucu tek satır alır."""
+    rows = []
+    for name in sorted(hostnames or []):
+        hv = hostvars.get(name, {}) if hasattr(hostvars, "get") else hostvars[name]
+        res = hv.get(result_var) or {}
+        base = {"server": name, "environment": hv.get("mysql_env", "")}
+        if res.get("status") != "CHECKED":
+            rows.append(dict(base, account="-", status=res.get("status") or "ERROR",
+                             plugin="", password="", missing="", flags="",
+                             planned=res.get("detail", "") if res else "Sonuç üretilemedi"))
+            continue
+        for a in res.get("accounts", []):
+            rows.append(dict(base, account=a["account"], status=a["status"], plugin=a["plugin"],
+                             password=a["password"], missing=", ".join(a["missing_privileges"]),
+                             flags=", ".join(a["flags"]), planned="; ".join(a["planned_actions"])))
+    return rows
+
+
+def mysqlreport_native_rows(hostnames, hostvars, result_var="mysqluser"):
+    """Audit: sunucudaki tüm mysql_native_password hesapları (düzeltilmeli)."""
+    rows = []
+    for name in sorted(hostnames or []):
+        hv = hostvars.get(name, {}) if hasattr(hostvars, "get") else hostvars[name]
+        res = hv.get(result_var) or {}
+        for acc in res.get("native_password_accounts", []):
+            rows.append({"server": name, "environment": hv.get("mysql_env", ""),
+                         "account": acc, "issue": "mysql_native_password -> caching_sha2_password'e geçirilmeli"})
+    return rows
+
+
 def mysqlreport_counts(rows):
     counts = {}
     for r in rows or []:
@@ -43,8 +74,7 @@ def mysqlreport_table(rows, columns=None):
     columns = columns or ["server", "environment", "ip", "port", "status", "method", "version", "detail"]
     if not rows:
         return "(kayıt yok)"
-    widths = {c: max(len(c), *(len(str(r.get(c, ""))) for r in rows)) for c in columns}
-    widths["detail"] = min(widths.get("detail", 0), 120)
+    widths = {c: min(120, max(len(c), *(len(str(r.get(c, ""))) for r in rows))) for c in columns}
 
     def fmt(r):
         return " | ".join(str(r.get(c, ""))[:widths[c]].ljust(widths[c]) for c in columns)
@@ -54,10 +84,18 @@ def mysqlreport_table(rows, columns=None):
     return "\n".join([header, sep] + [fmt(r) for r in rows])
 
 
+def mysqlreport_lines(rows, columns=None):
+    """Tabloyu satır listesi olarak döndür (AAP JSON çıktısında okunur kalsın)."""
+    return mysqlreport_table(rows, columns).splitlines()
+
+
 class FilterModule(object):
     def filters(self):
         return {
+            "mysqlreport_account_rows": mysqlreport_account_rows,
+            "mysqlreport_native_rows": mysqlreport_native_rows,
             "mysqlreport_rows": mysqlreport_rows,
             "mysqlreport_counts": mysqlreport_counts,
             "mysqlreport_table": mysqlreport_table,
+            "mysqlreport_lines": mysqlreport_lines,
         }

@@ -5,8 +5,8 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 | Faz | Kapsam | Risk | Durum |
 |---|---|---|---|
 | 1 | MSSQL envanter okuma, ortam eşleme (DEV/TEST/QA/PROD), dinamik grup, keşif raporu. Hedeflere bağlanmaz. | Yok (salt okunur) | Tamamlandı (63 satır, Type değerleri doğrulandı). Sunucu filtresi tırnak hatası düzeltildi |
-| 2 | SSH (uxsqlteam, become yok) + `mysql -u root` bağlantı testi; durum raporu. Değişiklik yapmaz. | Düşük | AAP'de doğrulandı (gbarkt02, TCP, 8.0.36). Tüm TEST ortamı çalıştırması bekleniyor |
-| 3 | User var mı / şifre aynı mı kontrolü (check-only). Yetki setleri (readonly, DML, DDL, superuser, superuser+GRANT OPTION) ve çoklu host (subnet) desteği. | Düşük | Tasarım onayı bekliyor |
+| 2 | SSH (uxsqlteam, become yok) + `mysql -u root` bağlantı testi; durum raporu. Değişiklik yapmaz. | Düşük | Tamamlandı: TEST 23/23 OK (gbapgt08 socket fallback), 2 SKIPPED |
+| 3 | User var mı / şifre aynı mı (hash karşılaştırma) / yetki farkı + native password audit. Değişiklik yapmaz. | Düşük | **Geliştirildi – AAP testi bekleniyor** |
 | 4 | Gerçek CREATE USER / GRANT; şifre farklıysa survey seçimi: `report` (default) / `update`; PROD için ek onay koruması. | Orta-Yüksek | Bekliyor |
 | 5 | Konsolide rapor (sunucu bazlı + özet; CSV/HTML artifact), son Job Template + Survey. | Düşük | Bekliyor |
 
@@ -41,3 +41,14 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
       sunucularda socket'e düşer.
 11. **Koleksiyon sürümü**: EE ansible-core 2.16.18 -> `community.general <12`.
     `community.mysql` kaldırıldı (hedeflerde PyMySQL gerekmesin diye mysql CLI kullanılıyor).
+12. **Şifre kontrolü: hash karşılaştırma (A, onaylandı).** Hedef şifre sunucuya gitmez.
+    Unicode şifrelerde hash, hesabın oluşturulduğu client karakter setine bağlıdır;
+    karşılaştırma UTF-8 ile yapılır (latin1 client ile oluşturulmuş Türkçe karakterli
+    şifreler `DIFFERENT` görünebilir).
+13. **Yetki setleri onaylandı**; `dml`'e LOCK TABLES + CREATE TEMPORARY TABLES eklendi
+    (öneri), EXECUTE eklenmedi.
+14. **Host default `%`** (survey'den değiştirilebilir). Her host ayrı MySQL hesabıdır.
+15. **`ALL` tespiti:** MySQL 8 `SHOW GRANTS` ALL'u statik yetki listesine açar; sürüme
+    göre değişen SUPER/REPLICATION hariç çekirdek liste mevcutsa ALL kabul edilir.
+    Dinamik yetkiler (BACKUP_ADMIN vb.) karşılaştırmaya dahil edilmez.
+16. **Öneri (onay bekliyor): Faz 4 yetki geri almaz (REVOKE yok)**; sadece eksikler eklenir, fazlalar raporlanır.

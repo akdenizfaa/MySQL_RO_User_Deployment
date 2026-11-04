@@ -1,0 +1,45 @@
+---
+# FAZ 3 - Kullanıcı kontrolü ve audit raporu. Hedeflerde DEĞİŞİKLİK YAPMAZ.
+#
+# Akış: girdi doğrulama -> MSSQL envanter -> bağlantı testi (Faz 2) ->
+#       hesap/şifre/yetki kontrolü -> native password audit -> rapor.
+#
+# Hedef kullanıcının şifresi MySQL sunucularına GÖNDERİLMEZ: mysql.user'daki
+# hash okunur ve AAP içinde karşılaştırılır (mimari karar A).
+#
+# AAP:
+#   Credential : SSH:uxsqlteam (Machine)
+#   Survey     : aap/surveys/user_check_survey.json
+
+- name: Girdileri doğrula ve envanteri oku
+  hosts: localhost
+  gather_facts: false
+  pre_tasks:
+    - name: MySQL admin şifresi survey'den gelmiş olmalı
+      ansible.builtin.assert:
+        that: mysql_admin_password | default('') | length > 0
+        fail_msg: "Survey'deki 'MySQL admin şifresi' alanı boş (mysql_admin_password)."
+        quiet: true
+    - name: Hedef kullanıcı girdileri
+      ansible.builtin.include_role:
+        name: mysql_user_check
+        tasks_from: validate.yml
+  roles:
+    - role: mysql_inventory
+
+- name: Bağlan ve hesapları kontrol et
+  hosts: mysql_targets
+  gather_facts: false
+  become: false
+  roles:
+    - role: mysql_connectivity
+    - role: mysql_user_check
+
+- name: Rapor
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: mysql_report
+      vars:
+        mysqlreport_title: "Faz 3 - MySQL kullanıcı kontrol ve audit raporu"
+        mysqlreport_include_accounts: true
