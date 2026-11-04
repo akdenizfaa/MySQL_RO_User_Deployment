@@ -7,8 +7,8 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 | 1 | MSSQL envanter okuma, ortam eşleme (DEV/TEST/QA/PROD), dinamik grup, keşif raporu. Hedeflere bağlanmaz. | Yok (salt okunur) | Tamamlandı (63 satır, Type değerleri doğrulandı). Sunucu filtresi tırnak hatası düzeltildi |
 | 2 | SSH (uxsqlteam, become yok) + `mysql -u root` bağlantı testi; durum raporu. Değişiklik yapmaz. | Düşük | Tamamlandı: TEST 23/23 OK (gbapgt08 socket fallback), 2 SKIPPED |
 | 3 | User var mı / şifre aynı mı (hash karşılaştırma) / yetki farkı + native password audit. Değişiklik yapmaz. | Düşük | Tamamlandı: TEST 23 sunucu, 17 hesap DIFFERENT / 6 NOT_EXISTS, 141 native hesap |
-| 4 | CREATE USER / GRANT / ALTER USER (update), check mode, read_only ve port uyuşmazlığı koruması, doğrulama. | Orta-Yüksek | **Geliştirildi – AAP check mode testi bekleniyor** |
-| 5 | Konsolide rapor (sunucu bazlı + özet; CSV/HTML artifact), son Job Template + Survey. | Düşük | Bekliyor |
+| 4 | CREATE USER / GRANT / ALTER USER (update), check mode, read_only / port / şifre politikası korumaları, doğrulama. | Orta-Yüksek | AAP'de check + run çalıştı; run gbadbt01'de ERROR 1819 (şifre politikası) -> ön kontrol eklendi, tekrar test bekleniyor |
+| 5 | Konsolide rapor: job çıktısı + AAP artifact yeterli (kullanıcı kararı, ayrıca CSV/HTML/e-posta yok). | — | Kapsam dışı (şimdilik) |
 
 ## Mimari kararlar
 
@@ -65,3 +65,10 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 23. **Native audit kategorileri**: CLUSTER_ROUTER_İÇ_HESAP (MySQL Shell/Router ile),
     ROOT (planlı bakım), UYGULAMA_SERVİS (client uyumluluğu doğrulanıp). Faz 4 yalnızca
     hedef kullanıcının hesaplarını dönüştürür; audit listesine dokunmaz.
+24. **Şifre politikası ön kontrolü** (gbadbt01 ERROR 1819 sonrası): `SHOW GLOBAL VARIABLES
+    LIKE 'validate%password%'` okunur, kurallar AAP içinde uygulanır (şifre sunucuya gitmez;
+    `VALIDATE_PASSWORD_STRENGTH()` bu yüzden kullanılmadı). MySQL 8.0.46 ile 60/60 doğrulandı.
+    `check_user_name` yalnızca oturum kullanıcısıyla (root) karşılaştırır.
+25. **Şifresi aynı native hesap**: `update` modunda yalnızca hedef kullanıcı için
+    `ALTER USER ... IDENTIFIED WITH caching_sha2_password BY <aynı şifre>`. Diğer native
+    hesaplar kapsam dışı (kullanıcı kararı).

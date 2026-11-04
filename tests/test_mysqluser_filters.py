@@ -208,3 +208,69 @@ def test_report_account_and_native_rows():
     assert rows[1]["planned"] == "Bağlantı durumu SSH_UNREACHABLE"
     assert r.mysqlreport_native_rows(["s1", "s2"], hv)[0]["account"] == "legacy@localhost"
     assert r.mysqlreport_lines(rows, ["server", "status"])[0].startswith("SERVER")
+
+
+# ---------------------------------------------------------------- şifre politikası
+# Beklenen sonuçlar MySQL 8.0.46 validate_password component ile birebir doğrulandı (60/60).
+MEDIUM = {"validate_password.policy": "MEDIUM", "validate_password.length": "8",
+          "validate_password.mixed_case_count": "1", "validate_password.number_count": "1",
+          "validate_password.special_char_count": "1", "validate_password.check_user_name": "ON",
+          "validate_password.dictionary_file": ""}
+
+
+@pytest.mark.parametrize("pw,ok", [
+    ("zayif", False), ("Zayif123", False), ("Zayif123!", True), ("AbCd12!@", True),
+    ("Şifre12!ab", True), ("kisa1A!", False),
+])
+def test_policy_medium_matches_mysql(pw, ok):
+    assert u.mysqluser_password_policy_check(pw, MEDIUM, ("root",))["ok"] is ok
+
+
+def test_policy_length_adjusted_and_strong_dictionary_unchecked():
+    pol = dict(MEDIUM, **{"validate_password.length": "4", "validate_password.mixed_case_count": "2",
+                          "validate_password.policy": "STRONG", "validate_password.dictionary_file": "/x/dict.txt"})
+    r = u.mysqluser_password_policy_check("AaBb1!", pol, ("root",))
+    assert r["rules"]["length"] == 6                      # 1 + 1 + 2*2
+    assert r["unchecked"] and r["ok"] is True
+
+
+def test_policy_inactive_and_session_user_name():
+    assert u.mysqluser_password_policy_check("a", {}, ("root",))["active"] is False
+    low = {"validate_password.policy": "0", "validate_password.length": "4",
+           "validate_password.check_user_name": "ON"}
+    assert u.mysqluser_password_policy_check("toor", low, ("root",))["ok"] is False
+    # hedef kullanıcı adı MySQL tarafından kontrol edilmez
+    assert u.mysqluser_password_policy_check("app_ro_x", low, ("root",))["ok"] is True
+
+
+def test_parse_policy_variables_old_and_new_names():
+    out = ("U\tapp\t%\tcaching_sha2_password\tAB\tN\tN\n"
+           "validate_password.length\t12\nvalidate_password_policy\tSTRONG\n")
+    pol = u.mysqluser_parse_accounts(out)["password_policy"]
+    assert pol == {"validate_password.length": "12", "validate_password.policy": "STRONG"}
+
+
+def test_policy_blocks_password_statements_and_grant_of_new_account():
+    inputs = u.mysqluser_validate("app", True, "%,10.%", ["readonly"], "update")
+    parsed = {"accounts": [{"user": "app", "host": "10.%", "plugin": "caching_sha2_password",
+                            "auth_hex": _vec("caching_sha2_password", "a")}],
+              "native": [], "password_policy": MEDIUM}
+    res = u.mysqluser_evaluate(inputs, parsed, {}, "zayif")
+    by = {a["account"]: a for a in res["accounts"]}
+    new, old = by["app@%"], by["app@10.%"]
+    assert all(st.get("blocked") for st in new["statements"])          # CREATE + GRANT
+    assert [bool(st.get("blocked")) for st in old["statements"]] == [True, False]   # ALTER engelli, GRANT değil
+    assert "ŞİFRE_POLİTİKASI_UYGUN_DEĞİL" in new["flags"]
+    assert "[ENGELLENDİ" in new["planned_actions"][0]
+    assert res["password_policy"]["ok"] is False and "zayif" not in str(res["password_policy"])
+
+
+def test_native_match_converted_only_in_update_mode():
+    parsed = {"accounts": [{"user": "app", "host": "%", "plugin": "mysql_native_password",
+                            "auth_hex": _vec("mysql_native_password", "a")}], "native": []}
+    grants = u.mysqluser_parse_grants("GRANT SELECT, SHOW VIEW ON *.* TO `app`@`%`")
+    upd = u.mysqluser_evaluate(u.mysqluser_validate("app", True, "%", ["readonly"], "update"), parsed, grants, "a")
+    rep = u.mysqluser_evaluate(u.mysqluser_validate("app", True, "%", ["readonly"], "report"), parsed, grants, "a")
+    assert [st["kind"] for st in upd["accounts"][0]["statements"]] == ["ALTER_USER_PLUGIN"]
+    assert rep["accounts"][0]["statements"] == []
+    assert "NATIVE_DÖNÜŞÜM_İÇİN_UPDATE_GEREKİR" in rep["accounts"][0]["flags"]

@@ -15,6 +15,8 @@
 - name: Uygulanacak planı hazırla
   ansible.builtin.set_fact:
     _ma_plan: "{{ (mysqluser.accounts | default([])) | mysqlapply_plan }}"
+    # Şifre politikasına takılan ifadeler çalıştırılmaz, sonuçta ayrı raporlanır
+    _ma_blocked: "{{ (mysqluser.accounts | default([])) | mysqlapply_blocked }}"
     mysqluser_before: "{{ mysqluser | default({}) }}"
 
 - name: Uygulanamayan durumları kaydet
@@ -23,6 +25,7 @@
       status: >-
         {{ 'SKIPPED_CONNECTION' if (mysqlconn.status | default('')) != 'OK'
            else 'SKIPPED_CHECK_ERROR' if (mysqluser.status | default('')) != 'CHECKED'
+           else 'BLOCKED_PASSWORD_POLICY' if (_ma_plan | length) == 0 and (_ma_blocked | length) > 0
            else 'NO_CHANGE' if (_ma_plan | length) == 0
            else 'SKIPPED_READ_ONLY' if (mysqlconn.read_only | default(false))
            else 'SKIPPED_PORT_MISMATCH' if (mysqlconn.port_mismatch | default(false))
@@ -34,7 +37,7 @@
            if (mysqlconn.port_mismatch | default(false)) and (_ma_plan | length) > 0
            else 'Check mode: SQL çalıştırılmadı' if ansible_check_mode and (_ma_plan | length) > 0
            else '' }}
-      results: "{{ _ma_plan | map('combine', {'result': 'PLANNED', 'error': ''}) | list }}"
+      results: "{{ (_ma_plan | map('combine', {'result': 'PLANNED', 'error': ''}) | list) + _ma_blocked }}"
   when: >-
     (mysqlconn.status | default('')) != 'OK'
     or (mysqluser.status | default('')) != 'CHECKED'
@@ -100,7 +103,7 @@
       detail: "{{ (_ma_results | selectattr('result', 'eq', 'FAILED') | map(attribute='error') | first | default('')) }}"
       results: "{{ _ma_results }}"
   vars:
-    _ma_results: "{{ _ma_plan | mysqlapply_result(_ma_exec.rc | default(1), _ma_exec.stderr | default(_ma_exec.msg | default(''))) }}"
+    _ma_results: "{{ (_ma_plan | mysqlapply_result(_ma_exec.rc | default(1), _ma_exec.stderr | default(_ma_exec.msg | default('')))) + _ma_blocked }}"
   when: _ma_exec is defined and _ma_exec is not skipped
 
 # Doğrulama: uygulamadan sonra aynı kontrolü tekrar çalıştır (sonrası durum).

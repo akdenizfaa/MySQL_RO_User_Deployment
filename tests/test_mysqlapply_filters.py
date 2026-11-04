@@ -47,3 +47,16 @@ def test_result_failure_first_line_and_unknown():
     res = a.mysqlapply_result(plan, 1, "mysql: command not found")
     assert set(r["result"] for r in res) == {"UNKNOWN"}
     assert a.mysqlapply_status([]) == "NO_CHANGE"
+
+
+def test_blocked_statements_excluded_from_plan():
+    accts = [{"account": "u@%", "statements": [
+        {"kind": "CREATE_USER", "template": "CREATE ...", "masked": "CREATE ...", "blocked": "şifre politikası"},
+        {"kind": "GRANT", "template": "GRANT ...", "masked": "GRANT ...", "blocked": "hesap oluşturulamadığı için"}]},
+        {"account": "u@10.%", "statements": [{"kind": "GRANT", "template": "GRANT X", "masked": "GRANT X"}]}]
+    assert [p["account"] for p in a.mysqlapply_plan(accts)] == ["u@10.%"]
+    blocked = a.mysqlapply_blocked(accts)
+    assert [b["result"] for b in blocked] == ["SKIPPED_PASSWORD_POLICY"] * 2
+    assert a.mysqlapply_status(blocked) == "BLOCKED_PASSWORD_POLICY"
+    applied = a.mysqlapply_result(a.mysqlapply_plan(accts), 0, "") + blocked
+    assert a.mysqlapply_status(applied) == "PARTIAL"

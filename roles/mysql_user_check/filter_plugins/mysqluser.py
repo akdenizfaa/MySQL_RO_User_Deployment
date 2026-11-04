@@ -125,7 +125,9 @@ def mysqluser_account_sql(user):
         "UNION ALL "
         "SELECT 'N', user, host, plugin, '', account_locked, '' "
         "FROM mysql.user WHERE plugin = 'mysql_native_password' "
-        "ORDER BY 1, 2, 3" % _q(user)
+        "ORDER BY 1, 2, 3; "
+        # Şifre politikası (validate_password component veya eski plugin). Satırlar 2 sütun.
+        "SHOW GLOBAL VARIABLES LIKE 'validate%%password%%'" % _q(user)
     )
 
 
@@ -139,9 +141,14 @@ def mysqluser_grants_sql(accounts):
 # ---------------------------------------------------------------------------
 def mysqluser_parse_accounts(stdout):
     """mysqluser_account_sql batch çıktısı -> {'accounts': [...], 'native': [...]}"""
-    accounts, native = [], []
+    accounts, native, policy = [], [], {}
     for line in str(stdout or "").splitlines():
         cols = line.split("\t")
+        if len(cols) == 2 and cols[0].lower().startswith("validate"):
+            # eski plugin adlandırması (validate_password_length) -> component (validate_password.length)
+            name = cols[0].lower().replace("validate_password_", "validate_password.")
+            policy[name] = cols[1]
+            continue
         if len(cols) < 7:
             continue
         kind, user, host, plugin, auth_hex, locked, expired = cols[:7]
@@ -152,7 +159,67 @@ def mysqluser_parse_accounts(stdout):
             accounts.append(rec)
         elif kind == "N":
             native.append(rec)
-    return {"accounts": accounts, "native": native}
+    return {"accounts": accounts, "native": native, "password_policy": policy}
+
+
+# ---------------------------------------------------------------------------
+# Şifre politikası (validate_password) yerel değerlendirmesi
+# Şifre sunucuya GÖNDERİLMEZ; MySQL kuralları burada uygulanır.
+# ---------------------------------------------------------------------------
+_POLICY_NAMES = {"0": "LOW", "1": "MEDIUM", "2": "STRONG"}
+
+
+def _int(v, default=0):
+    try:
+        return int(str(v).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def mysqluser_password_policy_check(password, policy, user_names=()):
+    """validate_password kurallarına göre değerlendir.
+
+    Dönen: {active, ok, policy, rules, reasons[], unchecked[]}
+    active=False -> sunucuda politika yok (her şifre kabul).
+    """
+    if not policy or "validate_password.policy" not in policy:
+        return {"active": False, "ok": True, "policy": "", "rules": {}, "reasons": [], "unchecked": []}
+    pw = str(password)
+    level = str(policy.get("validate_password.policy", "1")).strip().upper()
+    level = _POLICY_NAMES.get(level, level)
+    mixed = _int(policy.get("validate_password.mixed_case_count"), 1)
+    number = _int(policy.get("validate_password.number_count"), 1)
+    special = _int(policy.get("validate_password.special_char_count"), 1)
+    # MySQL, length'i bu toplamdan küçük olamayacak şekilde ayarlar
+    length = max(_int(policy.get("validate_password.length"), 8), number + special + 2 * mixed)
+    rules = {"policy": level, "length": length, "mixed_case_count": mixed,
+             "number_count": number, "special_char_count": special}
+    reasons, unchecked = [], []
+
+    if len(pw) < length:
+        reasons.append("en az %d karakter olmalı (şu an %d)" % (length, len(pw)))
+    if level in ("MEDIUM", "STRONG"):
+        lower = sum(1 for ch in pw if ch.islower())
+        upper = sum(1 for ch in pw if ch.isupper())
+        digits = sum(1 for ch in pw if ch.isdigit())
+        specials = sum(1 for ch in pw if not ch.isalnum())
+        if lower < mixed or upper < mixed:
+            reasons.append("en az %d küçük ve %d büyük harf olmalı" % (mixed, mixed))
+        if digits < number:
+            reasons.append("en az %d rakam olmalı" % number)
+        if specials < special:
+            reasons.append("en az %d özel karakter olmalı" % special)
+    if level == "STRONG" and str(policy.get("validate_password.dictionary_file", "")).strip():
+        unchecked.append("sözlük kontrolü (dictionary_file) yerelde yapılamaz")
+
+    check_name = str(policy.get("validate_password.check_user_name", "ON")).upper() in ("ON", "1")
+    if check_name:
+        for name in user_names:
+            if name and (pw.lower() == name.lower() or pw.lower() == name.lower()[::-1]):
+                reasons.append("kullanıcı adıyla aynı veya tersi olamaz")
+                break
+    return {"active": True, "ok": not reasons, "policy": level, "rules": rules,
+            "reasons": reasons, "unchecked": unchecked}
 
 
 _GRANT_RE = re.compile(r"^GRANT (?P<privs>.+?) ON (?P<obj>\S+) TO (?P<to>`[^`]*`@`[^`]*`|'[^']*'@'[^']*')(?P<rest>.*)$")
@@ -310,7 +377,7 @@ def _stmt(kind, template):
     return {"kind": kind, "template": template, "masked": template.replace(PW_TOKEN, "'********'")}
 
 
-def mysqluser_evaluate(inputs, parsed, grants, password):
+def mysqluser_evaluate(inputs, parsed, grants, password, admin_user="root"):
     """Hesap bazlı sonuç + Faz 4 SQL planı + sunucu audit'i.
 
     Her hesapta 'statements': [{kind, template, masked}]. template içinde şifre
@@ -320,6 +387,10 @@ def mysqluser_evaluate(inputs, parsed, grants, password):
     desired = mysqluser_desired(inputs["privilege_sets"])
     user = inputs["user"]
     existing = {a["host"].lower(): a for a in parsed.get("accounts", [])}
+    # check_user_name: MySQL yalnızca oturum kullanıcısının adıyla karşılaştırır
+    # (hedef hesabın adıyla değil) - MySQL 8.0.46 ile doğrulandı.
+    policy = mysqluser_password_policy_check(password, parsed.get("password_policy", {}),
+                                             (admin_user,))
     grant_suffix = " WITH GRANT OPTION" if desired["grant_option"] else ""
     results = []
 
@@ -348,6 +419,14 @@ def mysqluser_evaluate(inputs, parsed, grants, password):
             res["status"], res["password"] = "UNSUPPORTED_PLUGIN", "UNKNOWN"
         elif match:
             res["status"], res["password"] = "EXISTS_PASSWORD_MATCH", "MATCH"
+            if acc["plugin"] == "mysql_native_password":
+                if inputs["mismatch_action"] == "update":
+                    # Şifre aynı; yalnızca plugin dönüşümü (sadece hedef kullanıcı)
+                    res["statements"].append(_stmt(
+                        "ALTER_USER_PLUGIN", "ALTER USER %s IDENTIFIED WITH %s BY %s"
+                        % (acct, AUTH_PLUGIN, PW_TOKEN)))
+                else:
+                    res["flags"].append("NATIVE_DÖNÜŞÜM_İÇİN_UPDATE_GEREKİR")
         else:
             res["status"], res["password"] = "EXISTS_PASSWORD_DIFFERENT", "DIFFERENT"
             if inputs["mismatch_action"] == "update":
@@ -397,10 +476,27 @@ def mysqluser_evaluate(inputs, parsed, grants, password):
                 "statements": [],
             })
 
+    # Şifre politikası: şifre içeren ifadeler politikayı geçemiyorsa engellenir.
+    # Hesap yoksa (CREATE USER engellendi) aynı hesabın GRANT'ı da engellenir.
+    if policy["active"] and not policy["ok"]:
+        reason = "şifre politikası (%s): %s" % (policy["policy"], "; ".join(policy["reasons"]))
+        for r in results:
+            pw_blocked = False
+            for st in r["statements"]:
+                if PW_TOKEN in st["template"]:
+                    st["blocked"] = reason
+                    pw_blocked = True
+            if pw_blocked:
+                r["flags"].append("ŞİFRE_POLİTİKASI_UYGUN_DEĞİL")
+                if r["status"] == "NOT_EXISTS":
+                    for st in r["statements"]:
+                        st.setdefault("blocked", "hesap oluşturulamadığı için")
     for r in results:
-        r["planned_actions"] = [st["masked"] for st in r["statements"]]
+        r["planned_actions"] = [st["masked"] + (" [ENGELLENDİ: %s]" % st["blocked"] if st.get("blocked") else "")
+                                for st in r["statements"]]
     native = ["%s@%s" % (n["user"], n["host"]) for n in parsed.get("native", [])]
-    return {"accounts": results, "native_password_accounts": native}
+    return {"accounts": results, "native_password_accounts": native,
+            "password_policy": {k: v for k, v in policy.items()}}
 
 
 def mysqluser_render(template, password):
@@ -420,6 +516,7 @@ class FilterModule(object):
             "mysqluser_parse_accounts": mysqluser_parse_accounts,
             "mysqluser_parse_grants": mysqluser_parse_grants,
             "mysqluser_password_matches": mysqluser_password_matches,
+            "mysqluser_password_policy_check": mysqluser_password_policy_check,
             "mysqluser_evaluate": mysqluser_evaluate,
             "mysqluser_render": mysqluser_render,
         }

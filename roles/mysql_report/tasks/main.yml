@@ -49,6 +49,9 @@
                'accounts_by_status': mysqlreport_accounts | mysqlreport_counts,
                'native_password_account_count': mysqlreport_native | length,
                'native_password_by_category': mysqlreport_native | mysqlreport_count_by('category'),
+               'password_policy_blocked_servers': mysqlreport_accounts
+                   | selectattr('flags', 'search', 'ŞİFRE_POLİTİKASI_UYGUN_DEĞİL')
+                   | map(attribute='server') | unique | list,
                'native_password_servers': mysqlreport_native | map(attribute='server') | unique | list,
                'failed_servers': (mysqlreport_summary.failed_servers
                                   + (mysqlreport_accounts | selectattr('status', 'eq', 'QUERY_ERROR')
@@ -76,7 +79,7 @@
                'mode': 'CHECK' if ansible_check_mode else 'RUN',
                'statements_by_result': mysqlreport_apply | mysqlreport_count_by('result'),
                'failed_servers': (mysqlreport_summary.failed_servers
-                                  + (mysqlreport_apply | selectattr('result', 'in', ['FAILED', 'UNKNOWN'])
+                                  + (mysqlreport_apply | selectattr('result', 'in', ['FAILED', 'UNKNOWN', 'SKIPPED_PASSWORD_POLICY'])
                                      | map(attribute='server') | list)) | unique | list }) }}
 
     - name: Uygulama özeti

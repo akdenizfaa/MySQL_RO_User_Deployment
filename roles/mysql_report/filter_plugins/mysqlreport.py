@@ -39,6 +39,8 @@ def _post_text(acc):
     if not acc:
         return ""
     txt = acc["status"]
+    if acc.get("plugin"):
+        txt += " [%s]" % acc["plugin"]
     if acc.get("missing_privileges"):
         txt += " (eksik: %s)" % ", ".join(acc["missing_privileges"])
     return txt
@@ -68,6 +70,8 @@ def mysqlreport_account_rows(hostnames, hostvars, result_var="mysqluser"):
             res = [r["result"] for r in apply.get("results", []) if r["account"] == a["account"]]
             if not a.get("statements"):
                 apply_txt = "-"
+            elif "SKIPPED_PASSWORD_POLICY" in res and "FAILED" not in res:
+                apply_txt = "BLOCKED_PASSWORD_POLICY"
             elif apply.get("status") in ("CHECK_MODE", "SKIPPED_READ_ONLY", "SKIPPED_PORT_MISMATCH",
                                          "SKIPPED_CONNECTION", "SKIPPED_CHECK_ERROR"):
                 apply_txt = apply["status"]

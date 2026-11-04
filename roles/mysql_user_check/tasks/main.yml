@@ -103,7 +103,7 @@
          | combine(_mu_inputs | mysqluser_evaluate(
                      _mu_parsed,
                      (_mu_grants.stdout | default('')) | mysqluser_parse_grants,
-                     target_user_password)) }}
+                     target_user_password, mysql_admin_user)) }}
   when:
     - (mysqlconn.status | default('')) == 'OK'
     - (_mu_accounts.rc | default(1)) == 0

@@ -151,6 +151,8 @@ Job Template: `MySQL - User Deploy`
 | Fazla yetki | **REVOKE yok**; `extra` sütununda ve `FAZLA_YETKİ` işaretiyle raporlanır |
 | `read_only` / `super_read_only` | Yazılmaz (`SKIPPED_READ_ONLY`); primary'den replike olur, doğrulama replikayı da kontrol eder |
 | Envanter portu ≠ `@@port` | Yazılmaz (`SKIPPED_PORT_MISMATCH`): socket başka instance'a bağlanmış olabilir |
+| Şifre aynı + native + `update` | `ALTER USER ... IDENTIFIED WITH caching_sha2_password` (aynı şifre, yalnızca plugin dönüşümü; sadece hedef kullanıcı) |
+| Şifre politikası (`validate_password`) | Sunucu politikası okunur, şifre AAP içinde (sunucuya gönderilmeden) değerlendirilir; uymuyorsa şifre içeren ifadeler ve yeni hesabın GRANT'ı **çalıştırılmaz** (`SKIPPED_PASSWORD_POLICY`), nedenler raporlanır, job FAILED. Check modunda da yakalanır |
 | SQL hatası | İlk hatada durur; ifade bazlı `APPLIED` / `FAILED` / `NOT_RUN`, job FAILED |
 | Doğrulama | Uygulamadan sonra Faz 3 kontrolü tekrar çalışır, `post` sütununa yazılır |
 
@@ -165,6 +167,11 @@ olur. Survey'de tüm üyeler seçilse bile yalnızca yazılabilir üye (primary)
 
 - **Socket ile bağlantı `MYSQL_UNREACHABLE` (ERROR 2002 ... (13))**: `uxsqlteam`
   socket dizinine (örn. `/var/run/mysqld`) erişemiyor; dizin izni 755 olmalı veya TCP girişi açılmalı.
+- **`ERROR 1819: Your password does not satisfy the current policy requirements`**:
+  sunucuda `validate_password` etkin. Artık Faz 3 ve Faz 4 check modu bunu önceden
+  `ŞİFRE_POLİTİKASI_UYGUN_DEĞİL` olarak gösterir; `planned` sütunundaki
+  `[ENGELLENDİ: ...]` metni eksik kuralı (uzunluk, büyük/küçük harf, rakam, özel karakter) söyler.
+  STRONG politikadaki sözlük kontrolü yerelde yapılamaz.
 - **Hedef sayısı 0 / "Seçilen kriterlere uyan hedef sunucu yok"**: Sunucu filtresi
   alanına tırnak (`""`) yazmayın, boş bırakın. Envanterde olmayan adlar
   `server_filter_not_found` alanında listelenir.

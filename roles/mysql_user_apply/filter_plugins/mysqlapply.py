@@ -15,13 +15,30 @@ _ERR_LINE = re.compile(r"ERROR\s+(?P<code>\d{4})(?:\s+\([^)]*\))?\s+at line\s+(?
 
 
 def mysqlapply_plan(accounts):
-    """Hesap sonuçlarındaki ifadeleri sıralı tek listeye çevir."""
+    """Hesap sonuçlarındaki ifadeleri sıralı tek listeye çevir.
+
+    Engellenmiş (blocked, örn. şifre politikası) ifadeler plana girmez.
+    """
     plan = []
     for a in accounts or []:
         for st in a.get("statements", []):
+            if st.get("blocked"):
+                continue
             plan.append({"account": a["account"], "kind": st["kind"],
                          "template": st["template"], "masked": st["masked"]})
     return plan
+
+
+def mysqlapply_blocked(accounts):
+    """Çalıştırılmayacak (engellenmiş) ifadeler -> sonuç satırı."""
+    out = []
+    for a in accounts or []:
+        for st in a.get("statements", []):
+            if st.get("blocked"):
+                out.append({"account": a["account"], "kind": st["kind"], "template": st["template"],
+                            "masked": st["masked"], "result": "SKIPPED_PASSWORD_POLICY",
+                            "error": st["blocked"]})
+    return out
 
 
 def mysqlapply_script(plan, password):
@@ -65,6 +82,8 @@ def mysqlapply_status(results):
         return "APPLIED"
     if "APPLIED" in states:
         return "PARTIAL"
+    if states == {"SKIPPED_PASSWORD_POLICY"}:
+        return "BLOCKED_PASSWORD_POLICY"
     return "FAILED"
 
 
@@ -72,6 +91,7 @@ class FilterModule(object):
     def filters(self):
         return {
             "mysqlapply_plan": mysqlapply_plan,
+            "mysqlapply_blocked": mysqlapply_blocked,
             "mysqlapply_script": mysqlapply_script,
             "mysqlapply_result": mysqlapply_result,
             "mysqlapply_status": mysqlapply_status,
