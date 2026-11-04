@@ -1,19 +1,31 @@
 ---
-# ansible-builder v3 tanımı. Build:
-#   ansible-builder build -f execution-environment/execution-environment.yml -t <registry>/ee-mysql-user-mgmt:1.0
+# ansible-builder v3 tanımı (AAP 2.4 / Controller 4.5.x).
+# Build (podman olan, registry.redhat.io'ya login olmuş bir makinede):
+#   pip install ansible-builder
+#   cd execution-environment
+#   ansible-builder build -f execution-environment.yml -t <registry>/ee-mysql-user-mgmt:1.0
+#   podman push <registry>/ee-mysql-user-mgmt:1.0
+#
+# Neden gerekli: MSSQL'i okumak için EE içinde 'pymssql' Python kütüphanesi ve
+# community.general koleksiyonu olmalı. AAP'nin varsayılan EE'lerinde pymssql yok.
 version: 3
 
 images:
   base_image:
-    # Kurumunuzda kullandığınız onaylı EE base image ile değiştirin (Information Required #6).
-    name: registry.redhat.io/ansible-automation-platform-25/ee-minimal-rhel9:latest
+    name: registry.redhat.io/ansible-automation-platform-24/ee-minimal-rhel8:latest
+
+options:
+  package_manager_path: /usr/bin/microdnf
 
 dependencies:
-  galaxy: ../collections/requirements.yml
+  galaxy:
+    collections:
+      - name: community.general   # mssql_script
+        version: ">=8.0.0"
+      - name: community.mysql
+        version: ">=3.8.0"
   python: requirements.txt
-  system:
-    - freetds [platform:rpm]   # pymssql runtime bağımlılığı (wheel ile gelmiyorsa)
 
 additional_build_steps:
   append_final:
-    - RUN python3 -c "import pymssql, pymysql; print('drivers ok')"
+    - RUN python3 -c "import pymssql; print('pymssql ok')"

@@ -20,7 +20,7 @@
   ansible.builtin.set_fact:
     _mysqlinv_all: >-
       {{ mysqlinv_raw_rows
-         | mysqlinv_normalize(mysqlinv_env_type_map, mysqlinv_connect_via, mysqlinv_default_port) }}
+         | mysqlinv_normalize(mysqlinv_env_type_map, mysqlinv_default_port) }}
 
 - name: Hedefleri seç
   ansible.builtin.set_fact:
@@ -31,7 +31,7 @@
     mysqlinv_targets: "{{ _mysqlinv_selection.targets }}"
     mysqlinv_skipped: "{{ _mysqlinv_selection.skipped }}"
     mysqlinv_summary:
-      source: "{{ 'mock:' ~ mysqlinv_mock_file if mysqlinv_mock_file else mysqlinv_mssql_host ~ ':' ~ mysqlinv_mssql_port ~ '/' ~ mysqlinv_mssql_db }}"
+      source: "{{ 'mock:' ~ mysqlinv_mock_file if mysqlinv_mock_file else mssql_host ~ ',' ~ mssql_port ~ '/' ~ mssql_db }}"
       selected_environments: "{{ target_environments | mysqlinv_envs }}"
       server_filter: "{{ target_servers | mysqlinv_list }}"
       rows_read: "{{ mysqlinv_raw_rows | length }}"
@@ -47,14 +47,14 @@
     groups:
       - mysql_targets
       - "env_{{ item.environment }}"
-    # MySQL protokolüyle EE içinden bağlanılır; SSH kullanılmaz.
-    ansible_connection: local
-    ansible_python_interpreter: "{{ ansible_playbook_python }}"
-    mysql_host: "{{ item.host }}"
-    mysql_port: "{{ item.port }}"
+    # SSH ile ListeningIP'ye bağlanılır (AAP -> MySQL portu kapalı).
+    # SSH kullanıcısı/anahtarı ve dzdo yetki yükseltme AAP Machine credential'dan gelir.
+    ansible_host: "{{ item.ip }}"
+    ansible_port: "{{ mysqlinv_ssh_port }}"
+    mysql_port: "{{ item.port }}"        # MySQL portu (sunucu üzerinde, lokal bağlantı için)
     mysql_env: "{{ item.environment }}"
-    mysql_fqdn: "{{ item.fqdn }}"
+    mysql_fqdn: "{{ item.fqdn }}"        # sadece rapor amaçlı
   loop: "{{ mysqlinv_targets }}"
   loop_control:
-    label: "{{ item.name }} ({{ item.environment }}) {{ item.host }}:{{ item.port }}"
+    label: "{{ item.name }} ({{ item.environment }}) ssh={{ item.ip }} mysql_port={{ item.port }}"
   changed_when: false

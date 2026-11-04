@@ -37,16 +37,24 @@ def test_normalize_mapping_and_issues(rows):
     assert recs["gbarkt02"]["environment"] == "TEST"
     assert recs["gbarkt02"]["port"] == 3316
     assert recs["gbkmdp01"]["environment"] == "PROD"
-    assert recs["roarkp02"]["host"] == "192.168.100.52"      # Fqdn NULL -> IP
+    assert recs["roarkp02"]["ip"] == "192.168.100.52"
+    assert recs["mockqa01"]["environment"] == "QA"
     assert recs["mockqa01"]["port"] is None                   # '33o6'
     assert recs["mockunk01"]["environment"] == "UNMAPPED"
-    assert len(recs["mockunk01"]["issues"]) == 2              # type + host
+    assert len(recs["mockunk01"]["issues"]) == 2              # type + IP boş
 
 
-def test_fqdn_mode_falls_back_to_ip_for_short_names(rows):
-    recs = by_name(f.mysqlinv_normalize(rows, ENV_MAP, connect_via="fqdn"))
-    assert recs["gbarkt02"]["host"] == "gbarkt02.fw.garanti.com.tr"
-    assert recs["gbkmdp01"]["host"] == "10.230.103.235"       # Fqdn kısa ad
+def test_case_insensitive_type_and_default_port(rows):
+    recs = by_name(f.mysqlinv_normalize(rows, ENV_MAP))
+    assert recs["mockdev01"]["environment"] == "DEV"          # 'dev' -> DEV
+    assert recs["mockdev01"]["port"] == 3316                  # NULL port -> default
+
+
+def test_ip_only_no_fqdn_fallback():
+    recs = f.mysqlinv_normalize(
+        [{"ServerName": "x", "ListeningIP": "", "Fqdn": "x.dom.tr", "Type": "Test",
+          "ListeningPort": "3316", "isActive": 1}], ENV_MAP)
+    assert recs[0]["issues"] == ["ListeningIP boş (bağlantı IP ile yapılır)"]
 
 
 def test_select_prod_only(rows):

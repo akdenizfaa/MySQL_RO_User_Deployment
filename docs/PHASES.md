@@ -4,24 +4,22 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 
 | Faz | Kapsam | Risk | Durum |
 |---|---|---|---|
-| 1 | MSSQL envanter okuma, ortam eşleme (DEV/TEST/QA/PROD), dinamik grup, keşif raporu. MySQL'e bağlanmaz. | Yok (salt okunur) | **Tamamlandı – onay bekliyor** |
-| 2 | MySQL bağlantı testi (TCP + login), admin credential type, bağlantı durum raporu (OK / UNREACHABLE / AUTH_FAIL / ERROR). Değişiklik yapmaz. | Düşük | Bekliyor |
-| 3 | User var mı / şifre aynı mı kontrolü (check-only, dry-run). Yetki seti tanımları (readonly, DML, DDL, superuser) ve MySQL sürümüne göre grant listesi. | Düşük | Bekliyor |
-| 4 | Gerçek user create / grant uygulaması, `apply_mode` (report_only / create_missing / enforce), PROD için ek onay koruması. | Orta-Yüksek | Bekliyor |
-| 5 | Konsolide rapor (sunucu bazlı tablo + özet; HTML/CSV artifact), AAP Job Template + Survey'in son hali, isteğe bağlı workflow. | Düşük | Bekliyor |
+| 1 | MSSQL envanter okuma, ortam eşleme (DEV/TEST/QA/PROD), dinamik grup, keşif raporu. Hedeflere bağlanmaz. | Yok (salt okunur) | **Revize edildi – AAP testi bekleniyor** |
+| 2 | SSH + `dzdo su - mysql` + `mysql -u root` bağlantı testi; durum raporu (OK / SSH_UNREACHABLE / BECOME_FAIL / MYSQL_AUTH_FAIL / ERROR). Değişiklik yapmaz. | Düşük | Bekliyor |
+| 3 | User var mı / şifre aynı mı kontrolü (check-only). Yetki setleri (readonly, DML, DDL, superuser) ve çoklu host (subnet) desteği. | Düşük | Bekliyor |
+| 4 | Gerçek CREATE USER / GRANT, `apply_mode` (report_only / create_missing / enforce), PROD için ek onay koruması. | Orta-Yüksek | Bekliyor |
+| 5 | Konsolide rapor (sunucu bazlı + özet; CSV/HTML artifact), son Job Template + Survey. | Düşük | Bekliyor |
 
-## Kritik mimari kararlar (Faz 1)
+## Mimari kararlar
 
-1. **Envanter: add_host (runtime) — dinamik envanter plugin'i yerine.**
-   Survey'deki ortam seçimi aynı job içinde filtre olarak kullanılabiliyor; ayrı
-   Inventory Source + sync gerektirmiyor. Alternatif: AAP Inventory Source olarak
-   script/plugin — her job öncesi sync ister, survey ile süzmek zorlaşır.
-2. **MySQL'e EE içinden, MySQL protokolüyle bağlanılır (SSH yok).**
-   Hedef sunuculara `ansible_connection: local` atanır; modüller `login_host`
-   ile uzaktaki MySQL'e gider. SSH anahtarı/sudo gerekmez. Ön koşul: AAP execution
-   node'larından MySQL portlarına (3306/3316) ağ erişimi ve yetkili bir MySQL admin hesabı.
-3. **Bağlantı adresi default `ListeningIP`.** Bazı satırlarda Fqdn NULL veya kısa ad
-   (`gbkmdp01`, `roarkp02`). `mysqlinv_connect_via: fqdn` ile değiştirilebilir;
-   Fqdn geçersizse IP'ye düşer.
-4. **isActive filtresi Ansible'da.** Pasif sunucular raporda `isActive=0` olarak görünür.
-5. **Secret'lar env injector ile.** Credential'lar extra_vars'a yazılmaz.
+1. **Envanter: aynı job içinde `add_host`** (onaylandı). Survey'deki ortam seçimi
+   doğrudan filtre; ayrı Inventory Source/sync yok.
+2. **Hedeflere SSH ile bağlanılır** (onaylandı; AAP → 3316 kapalı).
+   `ansible_host = ListeningIP`, SSH portu 22. MySQL'e sunucu üzerinde lokal bağlanılır.
+3. **Bağlantı adresi yalnızca `ListeningIP`** (onaylandı; farklı domainler var,
+   DNS'e bağımlı olmamak için). IP boşsa kayıt "ListeningIP boş" nedeniyle elenir.
+4. **Hedef kriteri `isActive=1` ve `DeleteDate IS NULL`.** Pasifler raporda görünür.
+5. **Default MySQL portu 3316** (`ListeningPort` boşsa).
+6. **Şifreler survey'de `password` tipiyle** (MSSQL şifresi Faz 1, MySQL root şifresi Faz 2).
+   AAP bu alanları şifreli saklar ve job çıktısında `$encrypted$` gösterir.
+   Alternatif: AAP Credential (merkezi yönetim, tek yerden rotasyon) – şimdilik tercih edilmedi.

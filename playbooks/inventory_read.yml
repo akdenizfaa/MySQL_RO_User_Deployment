@@ -1,11 +1,13 @@
 ---
 # FAZ 1 - Salt okunur envanter keşfi.
 # MSSQL'den aktif MySQL sunucularını okur, survey'deki ortam(lar)a göre süzer,
-# dinamik gruplara ekler ve rapor verir. Hiçbir MySQL sunucusuna bağlanmaz.
+# dinamik gruplara ekler ve rapor verir. Hedef sunuculara SSH/MySQL bağlantısı YAPMAZ.
 #
 # AAP Survey değişkenleri:
 #   target_environments : multiselect (DEV, TEST, QA, PROD)
 #   target_servers      : opsiyonel, virgülle ayrılmış ServerName listesi
+#   mssql_user          : default Sql_inventory_user
+#   mssql_password      : password tipi (survey'de şifreli saklanır)
 
 - name: MySQL envanterini MSSQL'den oku
   hosts: localhost
@@ -37,10 +39,11 @@
           mysqlinv_skipped: "{{ mysqlinv_skipped }}"
         per_host: false
 
+# debug controller'da çalışır; hedeflere SSH açılmaz.
 - name: Dinamik grubun oluştuğunu doğrula
   hosts: mysql_targets
   gather_facts: false
   tasks:
     - name: Hedef
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }} -> {{ mysql_host }}:{{ mysql_port }} [{{ mysql_env }}]"
+        msg: "{{ inventory_hostname }} [{{ mysql_env }}] ssh={{ ansible_host }}:{{ ansible_port }} mysql_port={{ mysql_port }}"

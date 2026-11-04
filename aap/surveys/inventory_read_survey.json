@@ -1,13 +1,13 @@
 {
   "name": "MySQL Inventory Read",
-  "description": "Faz 1 - MSSQL envanterinden hedef MySQL sunucularını listeler",
+  "description": "Faz 1 - MSSQL envanterinden hedef MySQL sunucularını listeler (hedeflere bağlanmaz)",
   "spec": [
     {
       "question_name": "Ortam(lar)",
       "question_description": "Hedeflenecek ortamlar (çoklu seçim)",
       "variable": "target_environments",
       "type": "multiselect",
-      "choices": ["DEV", "TEST", "QA", "PROD"],
+      "choices": "DEV\nTEST\nQA\nPROD",
       "default": "TEST",
       "required": true
     },
@@ -18,7 +18,28 @@
       "type": "text",
       "default": "",
       "required": false,
+      "min": 0,
       "max": 4000
+    },
+    {
+      "question_name": "MSSQL kullanıcısı",
+      "question_description": "PGARSQLTEM01,1453 / MysqlInventory",
+      "variable": "mssql_user",
+      "type": "text",
+      "default": "Sql_inventory_user",
+      "required": true,
+      "min": 1,
+      "max": 128
+    },
+    {
+      "question_name": "MSSQL şifresi",
+      "question_description": "Survey'de şifreli saklanır, job çıktısında $encrypted$ görünür",
+      "variable": "mssql_password",
+      "type": "password",
+      "default": "",
+      "required": true,
+      "min": 1,
+      "max": 256
     }
   ]
 }

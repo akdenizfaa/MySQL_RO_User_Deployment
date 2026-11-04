@@ -1,2 +1,1 @@
 pymssql>=2.2.8
-PyMySQL>=1.1.0

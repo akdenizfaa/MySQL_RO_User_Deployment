@@ -2,21 +2,19 @@
 - name: MSSQL bağlantı bilgilerinin geldiğini doğrula
   ansible.builtin.assert:
     that:
-      - mysqlinv_mssql_host | length > 0
-      - mysqlinv_mssql_user | length > 0
-      - mysqlinv_mssql_password | length > 0
-    fail_msg: >-
-      MSSQL bağlantı bilgisi yok. Job Template'e 'MSSQL Inventory' credential'ını ekleyin
-      (MSSQL_INV_HOST / MSSQL_INV_USER / MSSQL_INV_PASSWORD).
+      - mssql_host | length > 0
+      - mssql_user | length > 0
+      - mssql_password | length > 0
+    fail_msg: "MSSQL şifresi boş. Survey'deki 'MSSQL şifresi' alanını doldurun (mssql_password)."
     quiet: true
 
 - name: MSSQL envanter tablosunu oku (salt okunur SELECT)
   community.general.mssql_script:
-    login_host: "{{ mysqlinv_mssql_host }}"
-    login_port: "{{ mysqlinv_mssql_port | int }}"
-    login_user: "{{ mysqlinv_mssql_user }}"
-    login_password: "{{ mysqlinv_mssql_password }}"
-    db: "{{ mysqlinv_mssql_db }}"
+    login_host: "{{ mssql_host }}"
+    login_port: "{{ mssql_port | int }}"
+    login_user: "{{ mssql_user }}"
+    login_password: "{{ mssql_password }}"
+    db: "{{ mssql_db }}"
     script: "{{ mysqlinv_query }}"
     output: dict
   register: _mysqlinv_mssql

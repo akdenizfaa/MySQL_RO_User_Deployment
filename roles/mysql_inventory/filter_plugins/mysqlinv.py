@@ -55,11 +55,12 @@ def mysqlinv_list(value):
     return [_s(v).lower() for v in value if _s(v)]
 
 
-def mysqlinv_normalize(rows, env_type_map, connect_via="ip", default_port=3306):
+def mysqlinv_normalize(rows, env_type_map, default_port=3316):
     """Ham satırları standart yapıya çevir.
 
     Dönen her kayıt:
-      name, host, port, ip, fqdn, type_raw, environment, is_active, issues[]
+      name, ip, port, fqdn, type_raw, environment, is_active, issues[]
+    Bağlantı her zaman ListeningIP ile yapılır (farklı domainler/DNS bağımsız).
     'issues' boş değilse kayıt hedef olarak kullanılamaz (raporda skip).
     """
     lookup = {}
@@ -80,13 +81,8 @@ def mysqlinv_normalize(rows, env_type_map, connect_via="ip", default_port=3306):
         if env == "UNMAPPED":
             issues.append("Type '%s' hiçbir ortama eşlenmedi" % type_raw)
 
-        # Fqdn bazı satırlarda NULL veya kısa ad; bu yüzden default IP.
-        if connect_via == "fqdn" and fqdn and "." in fqdn:
-            host = fqdn
-        else:
-            host = ip or (fqdn if "." in fqdn else "")
-        if not host:
-            issues.append("Bağlanılacak adres yok (ListeningIP/Fqdn boş)")
+        if not ip:
+            issues.append("ListeningIP boş (bağlantı IP ile yapılır)")
 
         if port_raw:
             if port_raw.isdigit() and 0 < int(port_raw) < 65536:
@@ -98,13 +94,12 @@ def mysqlinv_normalize(rows, env_type_map, connect_via="ip", default_port=3306):
             port = int(default_port)
 
         if not name:
-            name = host or "id-%s" % _s(row.get("id"))
+            name = ip or "id-%s" % _s(row.get("id"))
             issues.append("ServerName boş")
 
         out.append({
             "id": row.get("id"),
             "name": name,
-            "host": host,
             "port": port,
             "ip": ip,
             "fqdn": fqdn,

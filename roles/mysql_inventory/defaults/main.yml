@@ -1,14 +1,14 @@
 ---
 # ---------------------------------------------------------------------------
 # MSSQL envanter bağlantısı
-# Değerler AAP Custom Credential Type "MSSQL Inventory" ile env olarak gelir
-# (aap/credential_types/mssql_inventory.yml). Burada secret tutulmaz.
+# Şifre AAP Survey'deki 'password' tipli alandan gelir (mssql_password).
+# Repoda secret tutulmaz.
 # ---------------------------------------------------------------------------
-mysqlinv_mssql_host: "{{ lookup('ansible.builtin.env', 'MSSQL_INV_HOST') }}"
-mysqlinv_mssql_port: "{{ lookup('ansible.builtin.env', 'MSSQL_INV_PORT') | default('1433', true) }}"
-mysqlinv_mssql_user: "{{ lookup('ansible.builtin.env', 'MSSQL_INV_USER') }}"
-mysqlinv_mssql_password: "{{ lookup('ansible.builtin.env', 'MSSQL_INV_PASSWORD') }}"
-mysqlinv_mssql_db: "MysqlInventory"
+mssql_host: "PGARSQLTEM01"
+mssql_port: 1453
+mssql_user: "Sql_inventory_user"
+mssql_password: ""             # Survey (password tipi, $encrypted$)
+mssql_db: "MysqlInventory"
 
 # Sadece okuma. Temporal tablo: FOR SYSTEM_TIME yok -> güncel satırlar gelir.
 # isActive filtresi SQL'de DEĞİL Ansible'da yapılır; böylece pasif sunucular
@@ -21,20 +21,21 @@ mysqlinv_query: >-
 
 # ---------------------------------------------------------------------------
 # Type kolonu -> Survey ortamı eşlemesi (case-insensitive)
-# Assumption: tabloda görülen değerler 'Test' ve 'Production'.
-# DEV/QA karşılıkları teyit edilmeli (Information Required #1).
+# Tablodaki değerler: Dev, Test, QA, Production
 # ---------------------------------------------------------------------------
 mysqlinv_env_type_map:
-  DEV: ["Dev", "Development"]
+  DEV: ["Dev"]
   TEST: ["Test"]
-  QA: ["QA", "Preprod", "UAT"]
-  PROD: ["Production", "Prod"]
+  QA: ["QA"]
+  PROD: ["Production"]
 
-# ip | fqdn  -> Fqdn bazı satırlarda NULL/kısa ad olduğu için default ip
-mysqlinv_connect_via: ip
-mysqlinv_default_port: 3306
+# ListeningPort boşsa kullanılacak MySQL portu
+mysqlinv_default_port: 3316
 
-# Survey girdileri (playbook seviyesinde override edilir)
+# SSH bağlantısı (ListeningIP'ye). Kullanıcı/anahtar AAP Machine credential'dan gelir.
+mysqlinv_ssh_port: 22
+
+# Survey girdileri (extra vars ile override edilir)
 target_environments: []        # ['TEST','PROD'] veya "TEST,PROD"
 target_servers: ""             # opsiyonel: "gbarkt02,gbarkt04"
 
