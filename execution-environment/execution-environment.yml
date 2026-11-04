@@ -20,10 +20,8 @@ options:
 dependencies:
   galaxy:
     collections:
-      - name: community.general   # mssql_script
-        version: ">=8.0.0"
-      - name: community.mysql
-        version: ">=3.8.0"
+      - name: community.general   # mssql_script; 12+ ansible-core >=2.17 ister
+        version: ">=8.0.0,<12.0.0"
   python: requirements.txt
 
 additional_build_steps:

@@ -5,9 +5,9 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 | Faz | Kapsam | Risk | Durum |
 |---|---|---|---|
 | 1 | MSSQL envanter okuma, ortam eşleme (DEV/TEST/QA/PROD), dinamik grup, keşif raporu. Hedeflere bağlanmaz. | Yok (salt okunur) | Tamamlandı (63 satır, Type değerleri doğrulandı). Sunucu filtresi tırnak hatası düzeltildi |
-| 2 | SSH (uxsqlteam, become yok) + `mysql -u root` bağlantı testi; durum raporu. Değişiklik yapmaz. | Düşük | **Geliştirildi – AAP testi bekleniyor** |
-| 3 | User var mı / şifre aynı mı kontrolü (check-only). Yetki setleri (readonly, DML, DDL, superuser) ve çoklu host (subnet) desteği. | Düşük | Bekliyor |
-| 4 | Gerçek CREATE USER / GRANT, `apply_mode` (report_only / create_missing / enforce), PROD için ek onay koruması. | Orta-Yüksek | Bekliyor |
+| 2 | SSH (uxsqlteam, become yok) + `mysql -u root` bağlantı testi; durum raporu. Değişiklik yapmaz. | Düşük | AAP'de doğrulandı (gbarkt02, TCP, 8.0.36). Tüm TEST ortamı çalıştırması bekleniyor |
+| 3 | User var mı / şifre aynı mı kontrolü (check-only). Yetki setleri (readonly, DML, DDL, superuser, superuser+GRANT OPTION) ve çoklu host (subnet) desteği. | Düşük | Tasarım onayı bekliyor |
+| 4 | Gerçek CREATE USER / GRANT; şifre farklıysa survey seçimi: `report` (default) / `update`; PROD için ek onay koruması. | Orta-Yüksek | Bekliyor |
 | 5 | Konsolide rapor (sunucu bazlı + özet; CSV/HTML artifact), son Job Template + Survey. | Düşük | Bekliyor |
 
 ## Mimari kararlar
@@ -32,3 +32,12 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 9. **Root şifresi option file ile**: komut satırı/`MYSQL_PWD` yerine 0600 geçici dosya.
    `MYSQL_PWD` ve Ansible `environment:` uzak komut satırına önek olarak eklenir ve
    `ps` / `-vvv` çıktısında görünebilir.
+10. **Faz 3/4 kararları (kullanıcıdan):**
+    - `superuser` = `ALL PRIVILEGES ON *.*` **GRANT OPTION'sız** (default).
+      Ayrı seçenek `superuser_with_grant` = `... WITH GRANT OPTION`.
+    - Kullanıcı var ve şifre farklıysa davranış survey'den seçilir: `report` / `update`.
+    - Root sunucularda `'root'@'localhost'`; TCP 127.0.0.1 girişi gbarkt02'de başarılı
+      (127.0.0.1 -> localhost çözümleniyor). `auto` mod korunur; çözümlenmeyen
+      sunucularda socket'e düşer.
+11. **Koleksiyon sürümü**: EE ansible-core 2.16.18 -> `community.general <12`.
+    `community.mysql` kaldırıldı (hedeflerde PyMySQL gerekmesin diye mysql CLI kullanılıyor).

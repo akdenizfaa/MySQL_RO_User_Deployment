@@ -1,7 +1,6 @@
 ---
 # AAP Project sync bu dosyayı otomatik okur ve koleksiyonları kurar.
+# EE ansible-core 2.16: community.general 12+ ansible-core >=2.17 ister -> <12 sabit.
 collections:
-  - name: community.general   # mssql_script modülü (MSSQL envanter okuma)
-    version: ">=8.0.0"
-  - name: community.mysql     # mysql_user / mysql_query (Faz 2+)
-    version: ">=3.8.0"
+  - name: community.general   # mssql_script (MSSQL envanter okuma)
+    version: ">=8.0.0,<12.0.0"
