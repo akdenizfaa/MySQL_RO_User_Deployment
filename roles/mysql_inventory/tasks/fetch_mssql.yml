@@ -1,0 +1,28 @@
+---
+- name: MSSQL bağlantı bilgilerinin geldiğini doğrula
+  ansible.builtin.assert:
+    that:
+      - mysqlinv_mssql_host | length > 0
+      - mysqlinv_mssql_user | length > 0
+      - mysqlinv_mssql_password | length > 0
+    fail_msg: >-
+      MSSQL bağlantı bilgisi yok. Job Template'e 'MSSQL Inventory' credential'ını ekleyin
+      (MSSQL_INV_HOST / MSSQL_INV_USER / MSSQL_INV_PASSWORD).
+    quiet: true
+
+- name: MSSQL envanter tablosunu oku (salt okunur SELECT)
+  community.general.mssql_script:
+    login_host: "{{ mysqlinv_mssql_host }}"
+    login_port: "{{ mysqlinv_mssql_port | int }}"
+    login_user: "{{ mysqlinv_mssql_user }}"
+    login_password: "{{ mysqlinv_mssql_password }}"
+    db: "{{ mysqlinv_mssql_db }}"
+    script: "{{ mysqlinv_query }}"
+    output: dict
+  register: _mysqlinv_mssql
+  check_mode: false     # SELECT; check mode'da da çalışmalı yoksa hedef listesi boş kalır
+  changed_when: false   # modül her zaman changed=true döner, okuma için yanıltıcı
+
+- name: Ham satırları ayıkla
+  ansible.builtin.set_fact:
+    mysqlinv_raw_rows: "{{ (_mysqlinv_mssql.query_results_dict | default([[[]]]))[0][0] | default([]) }}"

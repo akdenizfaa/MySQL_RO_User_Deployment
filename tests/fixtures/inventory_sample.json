@@ -1,0 +1,12 @@
+[
+  {"id": 1,  "ServerName": "gbarkt02",  "ListeningIP": "10.230.109.104", "ListeningPort": "3316", "Fqdn": "gbarkt02.fw.garanti.com.tr", "Type": "Test",       "isActive": true},
+  {"id": 2,  "ServerName": "gbkmdp01",  "ListeningIP": "10.230.103.235", "ListeningPort": "3316", "Fqdn": "gbkmdp01",                   "Type": "Production", "isActive": true},
+  {"id": 5,  "ServerName": "gbarkap03", "ListeningIP": "10.236.100.156", "ListeningPort": "3316", "Fqdn": "gbarkap03.fw.garanti.com.tr","Type": "Production", "isActive": true},
+  {"id": 15, "ServerName": "roarkp02",  "ListeningIP": "192.168.100.52", "ListeningPort": "3316", "Fqdn": null,                         "Type": "Production", "isActive": true},
+  {"id": 22, "ServerName": "gbwspq01",  "ListeningIP": "10.230.109.75",  "ListeningPort": "3316", "Fqdn": "gbarkd01.fw.garanti.com.tr", "Type": "Test",       "isActive": false},
+  {"id": 23, "ServerName": "gbwspt02",  "ListeningIP": "10.230.109.74",  "ListeningPort": "3316", "Fqdn": null,                         "Type": "Test",       "isActive": false},
+  {"id": 24, "ServerName": "gbapgaq01", "ListeningIP": "10.236.108.92",  "ListeningPort": "3306", "Fqdn": "gbapgaq01.fw.garanti.com.tr","Type": "Test",       "isActive": true},
+  {"id": 37, "ServerName": "gbapgp01",  "ListeningIP": "10.230.113.15",  "ListeningPort": "3306", "Fqdn": "gbapgp01.fw.garanti.com.tr", "Type": "Production", "isActive": true},
+  {"id": 90, "ServerName": "mockqa01",  "ListeningIP": "10.0.0.10",      "ListeningPort": "33o6", "Fqdn": null,                         "Type": "QA",         "isActive": true},
+  {"id": 91, "ServerName": "mockunk01", "ListeningIP": "",               "ListeningPort": "3306", "Fqdn": null,                         "Type": "Staging",    "isActive": true}
+]

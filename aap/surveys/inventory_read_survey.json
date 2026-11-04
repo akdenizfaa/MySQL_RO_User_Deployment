@@ -1,0 +1,24 @@
+{
+  "name": "MySQL Inventory Read",
+  "description": "Faz 1 - MSSQL envanterinden hedef MySQL sunucularını listeler",
+  "spec": [
+    {
+      "question_name": "Ortam(lar)",
+      "question_description": "Hedeflenecek ortamlar (çoklu seçim)",
+      "variable": "target_environments",
+      "type": "multiselect",
+      "choices": ["DEV", "TEST", "QA", "PROD"],
+      "default": "TEST",
+      "required": true
+    },
+    {
+      "question_name": "Sunucu filtresi (opsiyonel)",
+      "question_description": "Virgülle ayrılmış ServerName listesi. Boş = seçilen ortamdaki tüm aktif sunucular",
+      "variable": "target_servers",
+      "type": "text",
+      "default": "",
+      "required": false,
+      "max": 4000
+    }
+  ]
+}

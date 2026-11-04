@@ -1,0 +1,60 @@
+---
+# Çıktılar:
+#   mysqlinv_targets   : bağlanılacak sunucular (list of dict)
+#   mysqlinv_skipped   : elenenler + neden
+#   mysqlinv_summary   : rapor özeti
+#   group 'mysql_targets' ve 'env_<ENV>' : add_host ile oluşturulan gruplar
+
+- name: Survey girdisini doğrula (ortam seçimi)
+  ansible.builtin.assert:
+    that:
+      - (target_environments | mysqlinv_envs | length) > 0
+    fail_msg: "En az bir ortam seçilmeli: DEV, TEST, QA, PROD"
+    quiet: true
+
+- name: Satırları kaynaktan oku
+  ansible.builtin.include_tasks:
+    file: "{{ 'fetch_mock.yml' if (mysqlinv_mock_file | length > 0) else 'fetch_mssql.yml' }}"
+
+- name: Satırları normalize et
+  ansible.builtin.set_fact:
+    _mysqlinv_all: >-
+      {{ mysqlinv_raw_rows
+         | mysqlinv_normalize(mysqlinv_env_type_map, mysqlinv_connect_via, mysqlinv_default_port) }}
+
+- name: Hedefleri seç
+  ansible.builtin.set_fact:
+    _mysqlinv_selection: "{{ _mysqlinv_all | mysqlinv_select(target_environments, target_servers) }}"
+
+- name: Sonuçları yayınla
+  ansible.builtin.set_fact:
+    mysqlinv_targets: "{{ _mysqlinv_selection.targets }}"
+    mysqlinv_skipped: "{{ _mysqlinv_selection.skipped }}"
+    mysqlinv_summary:
+      source: "{{ 'mock:' ~ mysqlinv_mock_file if mysqlinv_mock_file else mysqlinv_mssql_host ~ ':' ~ mysqlinv_mssql_port ~ '/' ~ mysqlinv_mssql_db }}"
+      selected_environments: "{{ target_environments | mysqlinv_envs }}"
+      server_filter: "{{ target_servers | mysqlinv_list }}"
+      rows_read: "{{ mysqlinv_raw_rows | length }}"
+      type_values_found: "{{ _mysqlinv_all | map(attribute='type_raw') | unique | sort }}"
+      unmapped_type_values: "{{ _mysqlinv_all | selectattr('environment', 'eq', 'UNMAPPED') | map(attribute='type_raw') | unique | sort }}"
+      target_count: "{{ _mysqlinv_selection.targets | length }}"
+      skipped_count: "{{ _mysqlinv_selection.skipped | length }}"
+      targets_per_env: "{{ _mysqlinv_selection.targets | mysqlinv_count_by_env(target_environments) }}"
+
+- name: Hedefleri dinamik gruplara ekle
+  ansible.builtin.add_host:
+    name: "{{ item.name }}"
+    groups:
+      - mysql_targets
+      - "env_{{ item.environment }}"
+    # MySQL protokolüyle EE içinden bağlanılır; SSH kullanılmaz.
+    ansible_connection: local
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    mysql_host: "{{ item.host }}"
+    mysql_port: "{{ item.port }}"
+    mysql_env: "{{ item.environment }}"
+    mysql_fqdn: "{{ item.fqdn }}"
+  loop: "{{ mysqlinv_targets }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.environment }}) {{ item.host }}:{{ item.port }}"
+  changed_when: false

@@ -1,0 +1,19 @@
+---
+# ansible-builder v3 tanımı. Build:
+#   ansible-builder build -f execution-environment/execution-environment.yml -t <registry>/ee-mysql-user-mgmt:1.0
+version: 3
+
+images:
+  base_image:
+    # Kurumunuzda kullandığınız onaylı EE base image ile değiştirin (Information Required #6).
+    name: registry.redhat.io/ansible-automation-platform-25/ee-minimal-rhel9:latest
+
+dependencies:
+  galaxy: ../collections/requirements.yml
+  python: requirements.txt
+  system:
+    - freetds [platform:rpm]   # pymssql runtime bağımlılığı (wheel ile gelmiyorsa)
+
+additional_build_steps:
+  append_final:
+    - RUN python3 -c "import pymssql, pymysql; print('drivers ok')"

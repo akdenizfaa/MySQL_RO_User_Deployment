@@ -1,0 +1,42 @@
+---
+# ---------------------------------------------------------------------------
+# MSSQL envanter bağlantısı
+# Değerler AAP Custom Credential Type "MSSQL Inventory" ile env olarak gelir
+# (aap/credential_types/mssql_inventory.yml). Burada secret tutulmaz.
+# ---------------------------------------------------------------------------
+mysqlinv_mssql_host: "{{ lookup('ansible.builtin.env', 'MSSQL_INV_HOST') }}"
+mysqlinv_mssql_port: "{{ lookup('ansible.builtin.env', 'MSSQL_INV_PORT') | default('1433', true) }}"
+mysqlinv_mssql_user: "{{ lookup('ansible.builtin.env', 'MSSQL_INV_USER') }}"
+mysqlinv_mssql_password: "{{ lookup('ansible.builtin.env', 'MSSQL_INV_PASSWORD') }}"
+mysqlinv_mssql_db: "MysqlInventory"
+
+# Sadece okuma. Temporal tablo: FOR SYSTEM_TIME yok -> güncel satırlar gelir.
+# isActive filtresi SQL'de DEĞİL Ansible'da yapılır; böylece pasif sunucular
+# raporda "isActive=0" olarak görünür (sessizce kaybolmaz).
+mysqlinv_query: >-
+  SELECT id, ServerName, ListeningIP, ListeningPort, Fqdn, [Type], isActive
+  FROM dbo.My_ServerInventory
+  WHERE DeleteDate IS NULL
+  ORDER BY ServerName
+
+# ---------------------------------------------------------------------------
+# Type kolonu -> Survey ortamı eşlemesi (case-insensitive)
+# Assumption: tabloda görülen değerler 'Test' ve 'Production'.
+# DEV/QA karşılıkları teyit edilmeli (Information Required #1).
+# ---------------------------------------------------------------------------
+mysqlinv_env_type_map:
+  DEV: ["Dev", "Development"]
+  TEST: ["Test"]
+  QA: ["QA", "Preprod", "UAT"]
+  PROD: ["Production", "Prod"]
+
+# ip | fqdn  -> Fqdn bazı satırlarda NULL/kısa ad olduğu için default ip
+mysqlinv_connect_via: ip
+mysqlinv_default_port: 3306
+
+# Survey girdileri (playbook seviyesinde override edilir)
+target_environments: []        # ['TEST','PROD'] veya "TEST,PROD"
+target_servers: ""             # opsiyonel: "gbarkt02,gbarkt04"
+
+# Test için: tanımlıysa MSSQL yerine bu JSON dosyasından satır okunur
+mysqlinv_mock_file: ""

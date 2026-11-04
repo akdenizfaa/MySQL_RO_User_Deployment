@@ -1,0 +1,46 @@
+---
+# FAZ 1 - Salt okunur envanter keşfi.
+# MSSQL'den aktif MySQL sunucularını okur, survey'deki ortam(lar)a göre süzer,
+# dinamik gruplara ekler ve rapor verir. Hiçbir MySQL sunucusuna bağlanmaz.
+#
+# AAP Survey değişkenleri:
+#   target_environments : multiselect (DEV, TEST, QA, PROD)
+#   target_servers      : opsiyonel, virgülle ayrılmış ServerName listesi
+
+- name: MySQL envanterini MSSQL'den oku
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: mysql_inventory
+
+  post_tasks:
+    - name: Envanter özeti
+      ansible.builtin.debug:
+        var: mysqlinv_summary
+
+    - name: Elenen kayıtlar
+      ansible.builtin.debug:
+        var: mysqlinv_skipped
+      when: mysqlinv_skipped | length > 0
+
+    - name: Eşlenmemiş Type değeri uyarısı
+      ansible.builtin.debug:
+        msg: >-
+          UYARI: Şu Type değerleri hiçbir ortama eşlenmedi: {{ mysqlinv_summary.unmapped_type_values }}.
+          mysqlinv_env_type_map değişkenini güncelleyin.
+      when: mysqlinv_summary.unmapped_type_values | length > 0
+
+    - name: Rapor verisini AAP job artifact'ına yaz (workflow'larda sonraki adıma geçer)
+      ansible.builtin.set_stats:
+        data:
+          mysqlinv_summary: "{{ mysqlinv_summary }}"
+          mysqlinv_skipped: "{{ mysqlinv_skipped }}"
+        per_host: false
+
+- name: Dinamik grubun oluştuğunu doğrula
+  hosts: mysql_targets
+  gather_facts: false
+  tasks:
+    - name: Hedef
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} -> {{ mysql_host }}:{{ mysql_port }} [{{ mysql_env }}]"

@@ -1,0 +1,7 @@
+---
+# AAP Project sync bu dosyayı otomatik okur ve koleksiyonları kurar.
+collections:
+  - name: community.general   # mssql_script modülü (MSSQL envanter okuma)
+    version: ">=8.0.0"
+  - name: community.mysql     # mysql_user / mysql_query (Faz 2+)
+    version: ">=3.8.0"
