@@ -1,0 +1,16 @@
+/usr/local/lib/python3.12/site-packages/paramiko/pkey.py:100: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "cipher": algorithms.TripleDES,
+/usr/local/lib/python3.12/site-packages/paramiko/transport.py:259: CryptographyDeprecationWarning: TripleDES has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.TripleDES and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  "class": algorithms.TripleDES,
+[DEPRECATION WARNING]: ANSIBLE_COLLECTIONS_PATHS option, does not fit var 
+naming standard, use the singular form ANSIBLE_COLLECTIONS_PATH instead. This 
+feature will be removed from ansible-core in version 2.19. Deprecation warnings
+ can be disabled by setting deprecation_warnings=False in ansible.cfg.
+SSH password: 
+ERROR! the role 'mysql_inventory' was not found in /runner/project/MySQLUserDeploy/playbooks/roles:/runner/requirements_roles:/root/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles:/runner/project/MySQLUserDeploy/playbooks
+The error appears to be in '/runner/project/MySQLUserDeploy/playbooks/inventory_read.yml': line 16, column 7, but may
+be elsewhere in the file depending on the exact syntax problem.
+The offending line appears to be:
+  roles:
+    - role: mysql_inventory
+      ^ here
