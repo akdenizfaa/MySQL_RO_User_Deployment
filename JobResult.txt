@@ -40,7 +40,29 @@ TASK [mysql_inventory : Sonuçları yayınla] **********************************
 ok: [localhost]
 
 TASK [mysql_inventory : Hedefleri dinamik gruplara ekle] ***********************
+ok: [localhost] => (item=gbadbt01 (TEST) ssh=10.230.169.13 mysql_port=3316)
+ok: [localhost] => (item=gbapgaq01 (TEST) ssh=10.236.108.92 mysql_port=3306)
+ok: [localhost] => (item=gbapgaq02 (TEST) ssh=10.236.108.93 mysql_port=3306)
+ok: [localhost] => (item=gbapgaq03 (TEST) ssh=10.236.108.94 mysql_port=3306)
+ok: [localhost] => (item=gbapgq01 (TEST) ssh=10.230.108.97 mysql_port=3306)
+ok: [localhost] => (item=gbapgq02 (TEST) ssh=10.230.108.99 mysql_port=3306)
+ok: [localhost] => (item=gbapgq03 (TEST) ssh=10.230.108.103 mysql_port=3306)
+ok: [localhost] => (item=gbapgt01 (TEST) ssh=10.230.108.56 mysql_port=3316)
+ok: [localhost] => (item=gbapgt08 (TEST) ssh=10.230.108.53 mysql_port=3316)
 ok: [localhost] => (item=gbarkt02 (TEST) ssh=10.230.109.104 mysql_port=3316)
+ok: [localhost] => (item=gbarkt04 (TEST) ssh=10.230.109.165 mysql_port=3316)
+ok: [localhost] => (item=gbarkt05 (TEST) ssh=10.230.109.112 mysql_port=3316)
+ok: [localhost] => (item=gbcnct03 (TEST) ssh=10.230.169.30 mysql_port=3316)
+ok: [localhost] => (item=gbkmdt01 (TEST) ssh=10.230.109.32 mysql_port=3316)
+ok: [localhost] => (item=gbmyst01 (TEST) ssh=10.230.108.59 mysql_port=3316)
+ok: [localhost] => (item=gbptlt01 (TEST) ssh=10.230.109.77 mysql_port=3306)
+ok: [localhost] => (item=gbptlt02 (TEST) ssh=10.230.109.78 mysql_port=3306)
+ok: [localhost] => (item=gbptlt03 (TEST) ssh=10.230.109.105 mysql_port=3306)
+ok: [localhost] => (item=gbqrkt03 (TEST) ssh=10.230.109.215 mysql_port=3316)
+ok: [localhost] => (item=gbqrkt04 (TEST) ssh=10.230.108.113 mysql_port=3316)
+ok: [localhost] => (item=gbtkst01 (TEST) ssh=10.151.224.175 mysql_port=3316)
+ok: [localhost] => (item=gbtkst02 (TEST) ssh=10.151.224.177 mysql_port=3316)
+ok: [localhost] => (item=gbtkst03 (TEST) ssh=10.151.224.178 mysql_port=3316)
 
 TASK [mysql_inventory : Hedef bulunamazsa job'ı anlaşılır mesajla durdur] ******
 skipping: [localhost]
@@ -48,28 +70,204 @@ skipping: [localhost]
 PLAY [Hedeflere bağlan] ********************************************************
 
 TASK [mysql_connectivity : 1/4 SSH bağlantısı] *********************************
+ok: [gbadbt01]
+ok: [gbapgaq03]
+ok: [gbapgq01]
+ok: [gbapgaq01]
+ok: [gbapgaq02]
+ok: [gbapgq02]
+ok: [gbapgq03]
+ok: [gbapgt01]
+ok: [gbapgt08]
 ok: [gbarkt02]
+ok: [gbarkt04]
+ok: [gbcnct03]
+ok: [gbarkt05]
+ok: [gbmyst01]
+ok: [gbkmdt01]
+ok: [gbqrkt03]
+ok: [gbptlt01]
+ok: [gbptlt02]
+ok: [gbptlt03]
+ok: [gbqrkt04]
+ok: [gbtkst01]
+ok: [gbtkst02]
+ok: [gbtkst03]
 
 TASK [mysql_connectivity : 2/4 mysql client'ı bul (login shell PATH + bilinen yollar)] ***
+ok: [gbadbt01]
+ok: [gbapgq01]
+ok: [gbapgaq01]
+ok: [gbapgaq02]
+ok: [gbapgaq03]
+ok: [gbapgq03]
+ok: [gbapgq02]
+ok: [gbapgt01]
 ok: [gbarkt02]
+ok: [gbapgt08]
+ok: [gbcnct03]
+ok: [gbarkt05]
+ok: [gbkmdt01]
+ok: [gbarkt04]
+ok: [gbmyst01]
+ok: [gbptlt01]
+ok: [gbqrkt03]
+ok: [gbptlt03]
+ok: [gbptlt02]
+ok: [gbqrkt04]
+ok: [gbtkst01]
+ok: [gbtkst02]
+ok: [gbtkst03]
 
 TASK [mysql_connectivity : Geçici client option file oluştur] ******************
+ok: [gbadbt01]
+ok: [gbapgaq01]
+ok: [gbapgaq02]
+ok: [gbapgaq03]
+ok: [gbapgq01]
+ok: [gbapgq03]
+ok: [gbapgt01]
+ok: [gbapgq02]
 ok: [gbarkt02]
+ok: [gbapgt08]
+ok: [gbcnct03]
+ok: [gbkmdt01]
+ok: [gbarkt05]
+ok: [gbmyst01]
+ok: [gbptlt01]
+ok: [gbarkt04]
+ok: [gbptlt03]
+ok: [gbqrkt03]
+ok: [gbptlt02]
+ok: [gbtkst01]
+ok: [gbtkst02]
+ok: [gbqrkt04]
+ok: [gbtkst03]
 
 TASK [mysql_connectivity : Kimlik bilgisini option file'a yaz] *****************
+ok: [gbadbt01]
+ok: [gbapgaq01]
+ok: [gbapgaq02]
+ok: [gbapgaq03]
+ok: [gbapgq01]
+ok: [gbapgq03]
+ok: [gbapgt01]
 ok: [gbarkt02]
+ok: [gbapgt08]
+ok: [gbapgq02]
+ok: [gbarkt04]
+ok: [gbarkt05]
+ok: [gbcnct03]
+ok: [gbkmdt01]
+ok: [gbmyst01]
+ok: [gbptlt01]
+ok: [gbqrkt03]
+ok: [gbptlt03]
+ok: [gbptlt02]
+ok: [gbqrkt04]
+ok: [gbtkst02]
+ok: [gbtkst01]
+ok: [gbtkst03]
 
 TASK [mysql_connectivity : TCP ile bağlan (127.0.0.1:3316)] ********************
+ok: [gbadbt01]
+ok: [gbapgaq01]
+ok: [gbapgaq02]
+ok: [gbapgaq03]
+ok: [gbapgq01]
+ok: [gbapgq03]
+ok: [gbapgt01]
+ok: [gbapgq02]
+ok: [gbapgt08]
+ok: [gbcnct03]
 ok: [gbarkt02]
+ok: [gbarkt04]
+ok: [gbarkt05]
+ok: [gbkmdt01]
+ok: [gbmyst01]
+ok: [gbptlt01]
+ok: [gbqrkt03]
+ok: [gbptlt03]
+ok: [gbptlt02]
+ok: [gbtkst01]
+ok: [gbtkst02]
+ok: [gbqrkt04]
+ok: [gbtkst03]
 
 TASK [mysql_connectivity : Socket ile bağlan (socket modu veya TCP auth/port hatası)] ***
+skipping: [gbadbt01]
+skipping: [gbapgaq01]
+skipping: [gbapgaq02]
+skipping: [gbapgaq03]
+skipping: [gbapgq01]
+skipping: [gbapgq02]
+skipping: [gbapgt01]
+skipping: [gbapgq03]
+skipping: [gbarkt04]
 skipping: [gbarkt02]
+skipping: [gbarkt05]
+skipping: [gbcnct03]
+skipping: [gbmyst01]
+skipping: [gbkmdt01]
+skipping: [gbptlt01]
+skipping: [gbptlt02]
+skipping: [gbptlt03]
+skipping: [gbqrkt03]
+skipping: [gbqrkt04]
+skipping: [gbtkst01]
+skipping: [gbtkst02]
+skipping: [gbtkst03]
+ok: [gbapgt08]
 
 TASK [mysql_connectivity : Geçici option file'ı sil] ***************************
+ok: [gbadbt01]
+ok: [gbapgaq02]
+ok: [gbapgaq01]
+ok: [gbapgaq03]
+ok: [gbapgq01]
+ok: [gbapgq03]
+ok: [gbapgt01]
+ok: [gbapgq02]
 ok: [gbarkt02]
+ok: [gbapgt08]
+ok: [gbcnct03]
+ok: [gbarkt05]
+ok: [gbarkt04]
+ok: [gbkmdt01]
+ok: [gbmyst01]
+ok: [gbptlt01]
+ok: [gbqrkt03]
+ok: [gbptlt03]
+ok: [gbptlt02]
+ok: [gbqrkt04]
+ok: [gbtkst01]
+ok: [gbtkst02]
+ok: [gbtkst03]
 
 TASK [mysql_connectivity : 4/4 Sonucu sınıflandır] *****************************
+ok: [gbadbt01]
+ok: [gbapgaq01]
+ok: [gbapgaq02]
+ok: [gbapgaq03]
+ok: [gbapgq01]
+ok: [gbapgq02]
+ok: [gbapgq03]
+ok: [gbapgt01]
+ok: [gbapgt08]
 ok: [gbarkt02]
+ok: [gbarkt04]
+ok: [gbarkt05]
+ok: [gbcnct03]
+ok: [gbkmdt01]
+ok: [gbmyst01]
+ok: [gbptlt01]
+ok: [gbptlt02]
+ok: [gbptlt03]
+ok: [gbqrkt03]
+ok: [gbqrkt04]
+ok: [gbtkst01]
+ok: [gbtkst02]
+ok: [gbtkst03]
 
 PLAY [Rapor] *******************************************************************
 
@@ -82,9 +280,33 @@ ok: [localhost]
 TASK [mysql_report : Rapor tablosu] ********************************************
 ok: [localhost] => {
     "msg": [
-        "SERVER   | ENVIRONMENT | IP             | PORT | STATUS | METHOD | VERSION | DETAIL",
-        "---------+-------------+----------------+------+--------+--------+---------+-------",
-        "gbarkt02 | TEST        | 10.230.109.104 | 3316 | OK     | tcp    | 8.0.36  |       "
+        "SERVER    | ENVIRONMENT | IP             | PORT | STATUS  | METHOD | VERSION | DETAIL                                           ",
+        "----------+-------------+----------------+------+---------+--------+---------+--------------------------------------------------",
+        "gbadbt01  | TEST        | 10.230.169.13  | 3316 | OK      | tcp    | 8.4.5   |                                                  ",
+        "gbapgaq01 | TEST        | 10.236.108.92  | 3306 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbapgaq02 | TEST        | 10.236.108.93  | 3306 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbapgaq03 | TEST        | 10.236.108.94  | 3306 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbapgq01  | TEST        | 10.230.108.97  | 3306 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbapgq02  | TEST        | 10.230.108.99  | 3306 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbapgq03  | TEST        | 10.230.108.103 | 3306 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbapgt01  | TEST        | 10.230.108.56  | 3316 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbapgt08  | TEST        | 10.230.108.53  | 3316 | OK      | socket | 8.0.45  | TCP başarısız (ERROR 1045), socket ile bağlanıldı",
+        "gbarkt02  | TEST        | 10.230.109.104 | 3316 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbarkt04  | TEST        | 10.230.109.165 | 3316 | OK      | tcp    | 8.4.5   |                                                  ",
+        "gbarkt05  | TEST        | 10.230.109.112 | 3316 | OK      | tcp    | 8.0.32  |                                                  ",
+        "gbcnct03  | TEST        | 10.230.169.30  | 3316 | OK      | tcp    | 8.4.5   |                                                  ",
+        "gbkmdt01  | TEST        | 10.230.109.32  | 3316 | OK      | tcp    | 8.0.45  |                                                  ",
+        "gbmyst01  | TEST        | 10.230.108.59  | 3316 | OK      | tcp    | 8.0.45  |                                                  ",
+        "gbptlt01  | TEST        | 10.230.109.77  | 3306 | OK      | tcp    | 8.0.45  |                                                  ",
+        "gbptlt02  | TEST        | 10.230.109.78  | 3306 | OK      | tcp    | 8.0.45  |                                                  ",
+        "gbptlt03  | TEST        | 10.230.109.105 | 3306 | OK      | tcp    | 8.0.45  |                                                  ",
+        "gbqrkt03  | TEST        | 10.230.109.215 | 3316 | OK      | tcp    | 8.0.32  |                                                  ",
+        "gbqrkt04  | TEST        | 10.230.108.113 | 3316 | OK      | tcp    | 8.0.32  |                                                  ",
+        "gbtkst01  | TEST        | 10.151.224.175 | 3316 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbtkst02  | TEST        | 10.151.224.177 | 3316 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbtkst03  | TEST        | 10.151.224.178 | 3316 | OK      | tcp    | 8.0.36  |                                                  ",
+        "gbwspq01  | TEST        |                |      | SKIPPED |        |         | isActive=0                                       ",
+        "gbwspt02  | TEST        |                |      | SKIPPED |        |         | isActive=0                                       "
     ]
 }
 
@@ -92,15 +314,18 @@ TASK [mysql_report : Rapor özeti] *********************************************
 ok: [localhost] => {
     "mysqlreport_summary": {
         "by_status": {
-            "OK": 1
+            "OK": 23,
+            "SKIPPED": 2
         },
         "environments": [
             "TEST"
         ],
         "failed_servers": [],
         "title": "Faz 2 - MySQL bağlantı raporu",
-        "total_targets": "1",
-        "warning_servers": []
+        "total_targets": "23",
+        "warning_servers": [
+            "gbapgt08"
+        ]
     }
 }
 
@@ -111,5 +336,27 @@ TASK [mysql_report : Başarısız sunucu varsa job'ı FAILED işaretle] ********
 skipping: [localhost]
 
 PLAY RECAP *********************************************************************
+gbadbt01                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbapgaq01                  : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbapgaq02                  : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbapgaq03                  : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbapgq01                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbapgq02                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbapgq03                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbapgt01                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbapgt08                   : ok=8    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
 gbarkt02                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbarkt04                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbarkt05                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbcnct03                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbkmdt01                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbmyst01                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbptlt01                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbptlt02                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbptlt03                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbqrkt03                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbqrkt04                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbtkst01                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbtkst02                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+gbtkst03                   : ok=7    changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
 localhost                  : ok=15   changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
