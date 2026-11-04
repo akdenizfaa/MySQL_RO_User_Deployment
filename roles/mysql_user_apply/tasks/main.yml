@@ -1,0 +1,123 @@
+---
+# Faz 4 - Planı uygula. mysql_connectivity + mysql_user_check'ten SONRA çalışır.
+#
+# Güvenlik:
+#  - Check mode (AAP Job Type: Check): hiçbir SQL çalışmaz, plan maskeli raporlanır.
+#  - read_only / super_read_only sunuculara (replika, Group Replication secondary)
+#    yazılmaz; değişiklik primary'den replike olur.
+#  - Envanter portu ile @@port uyuşmuyorsa (socket başka instance'a gitmiş olabilir)
+#    yazılmaz.
+#  - Hedef şifre yalnızca no_log task'ın stdin'inde bulunur (komut satırında/ps'te yok).
+#  - REVOKE yapılmaz; sadece eksikler eklenir.
+#
+# Çıktı (host fact): mysqlapply = {status, detail, results[]}
+
+- name: Uygulanacak planı hazırla
+  ansible.builtin.set_fact:
+    _ma_plan: "{{ (mysqluser.accounts | default([])) | mysqlapply_plan }}"
+    mysqluser_before: "{{ mysqluser | default({}) }}"
+
+- name: Uygulanamayan durumları kaydet
+  ansible.builtin.set_fact:
+    mysqlapply:
+      status: >-
+        {{ 'SKIPPED_CONNECTION' if (mysqlconn.status | default('')) != 'OK'
+           else 'SKIPPED_CHECK_ERROR' if (mysqluser.status | default('')) != 'CHECKED'
+           else 'NO_CHANGE' if (_ma_plan | length) == 0
+           else 'SKIPPED_READ_ONLY' if (mysqlconn.read_only | default(false))
+           else 'SKIPPED_PORT_MISMATCH' if (mysqlconn.port_mismatch | default(false))
+           else 'CHECK_MODE' }}
+      detail: >-
+        {{ 'read_only/super_read_only: değişiklik primary üzerinden replike olmalı'
+           if (mysqlconn.read_only | default(false)) and (_ma_plan | length) > 0
+           else 'Bağlanılan instance portu envanterle uyuşmuyor (@@port ' ~ (mysqlconn.server_port | default('?')) ~ '); yanlış instance riski, yazılmadı'
+           if (mysqlconn.port_mismatch | default(false)) and (_ma_plan | length) > 0
+           else 'Check mode: SQL çalıştırılmadı' if ansible_check_mode and (_ma_plan | length) > 0
+           else '' }}
+      results: "{{ _ma_plan | map('combine', {'result': 'PLANNED', 'error': ''}) | list }}"
+  when: >-
+    (mysqlconn.status | default('')) != 'OK'
+    or (mysqluser.status | default('')) != 'CHECKED'
+    or (_ma_plan | length) == 0
+    or (mysqlconn.read_only | default(false))
+    or (mysqlconn.port_mismatch | default(false))
+    or ansible_check_mode
+
+- name: Planı uygula
+  when: mysqlapply is not defined
+  block:
+    - name: Bağlantı argümanlarını hazırla
+      ansible.builtin.set_fact:
+        _ma_conn_args: >-
+          {{ ['--protocol=TCP', '--host=127.0.0.1', '--port=' ~ mysql_port]
+             if mysqlconn.method == 'tcp' else ['--protocol=SOCKET'] }}
+
+    - name: Geçici client option file oluştur
+      ansible.builtin.tempfile:
+        state: file
+        path: "{{ mysql_tmp_dir | default('/tmp') }}"
+        prefix: ".ans_mycnf_"
+      register: _ma_cnf
+      changed_when: false
+
+    - name: Kimlik bilgisini option file'a yaz
+      ansible.builtin.copy:
+        dest: "{{ _ma_cnf.path }}"
+        mode: "0600"
+        content: "{{ mysql_admin_password | mysqlconn_cnf(mysql_admin_user) }}"
+      no_log: true
+      changed_when: false
+
+    # Tüm ifadeler tek çağrıda, stdin ile. mysql ilk hatada durur ve satır numarası
+    # verir; her ifade ayrı satırda olduğundan hangi ifadenin hata verdiği kesin.
+    - name: SQL ifadelerini çalıştır ({{ _ma_plan | length }} ifade)
+      ansible.builtin.command:
+        argv: >-
+          {{ [mysqlconn.client, '--defaults-extra-file=' ~ _ma_cnf.path]
+             + _ma_conn_args
+             + ['--batch', '--skip-column-names', '--default-character-set=utf8mb4'] }}
+        stdin: "{{ _ma_plan | mysqlapply_script(target_user_password) }}"
+      register: _ma_exec
+      no_log: true          # stdin hedef şifreyi içerir
+      failed_when: false
+      # En az bir ifade uygulandıysa changed (AAP'de değişiklik yapılan host'lar sarı görünür)
+      changed_when: >-
+        'APPLIED' in (_ma_plan | mysqlapply_result(_ma_exec.rc, _ma_exec.stderr | default(''))
+                      | map(attribute='result') | list)
+
+  always:
+    - name: Geçici option file'ı sil
+      ansible.builtin.file:
+        path: "{{ _ma_cnf.path }}"
+        state: absent
+      changed_when: false
+      when: _ma_cnf.path is defined
+
+- name: Uygulama sonucunu kaydet
+  ansible.builtin.set_fact:
+    mysqlapply:
+      status: "{{ _ma_results | mysqlapply_status }}"
+      detail: "{{ (_ma_results | selectattr('result', 'eq', 'FAILED') | map(attribute='error') | first | default('')) }}"
+      results: "{{ _ma_results }}"
+  vars:
+    _ma_results: "{{ _ma_plan | mysqlapply_result(_ma_exec.rc | default(1), _ma_exec.stderr | default(_ma_exec.msg | default(''))) }}"
+  when: _ma_exec is defined and _ma_exec is not skipped
+
+# Doğrulama: uygulamadan sonra aynı kontrolü tekrar çalıştır (sonrası durum).
+- name: Uygulama sonrası doğrulama
+  ansible.builtin.include_role:
+    name: mysql_user_check
+  when:
+    - not ansible_check_mode
+    - (mysqlconn.status | default('')) == 'OK'
+    - (mysqlapply.status | default('')) in ['APPLIED', 'PARTIAL', 'FAILED', 'SKIPPED_READ_ONLY']
+    - not (mysqlconn.port_mismatch | default(false))
+
+- name: Doğrulamanın çalıştığını işaretle
+  ansible.builtin.set_fact:
+    mysqluser_post_checked: true
+  when:
+    - not ansible_check_mode
+    - (mysqlconn.status | default('')) == 'OK'
+    - (mysqlapply.status | default('')) in ['APPLIED', 'PARTIAL', 'FAILED', 'SKIPPED_READ_ONLY']
+    - not (mysqlconn.port_mismatch | default(false))

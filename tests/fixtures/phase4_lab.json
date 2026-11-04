@@ -1,0 +1,6 @@
+[
+  {"id": 1, "ServerName": "lab-primary",   "ListeningIP": "127.0.0.1", "ListeningPort": "3316", "Fqdn": null, "Type": "Test", "isActive": true},
+  {"id": 2, "ServerName": "lab-replica",   "ListeningIP": "127.0.0.1", "ListeningPort": "3317", "Fqdn": null, "Type": "Test", "isActive": true},
+  {"id": 3, "ServerName": "lab-wrongport", "ListeningIP": "127.0.0.1", "ListeningPort": "3399", "Fqdn": null, "Type": "Test", "isActive": true},
+  {"id": 4, "ServerName": "lab-sshdown",   "ListeningIP": "127.0.0.3", "ListeningPort": "3316", "Fqdn": null, "Type": "Test", "isActive": true}
+]

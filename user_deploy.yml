@@ -1,0 +1,56 @@
+---
+# FAZ 4 - Kullanıcı oluşturma / yetki verme / (seçime göre) şifre güncelleme.
+#
+# ÖNCE Check modunda çalıştırın (AAP Job Type: Check): plan maskeli raporlanır,
+# hiçbir SQL çalışmaz. Sonra Job Type: Run.
+#
+# Akış: girdi doğrulama -> envanter -> bağlantı -> kontrol (Faz 3) ->
+#       uygula -> doğrulama (aynı kontrol tekrar) -> rapor
+#
+# Kurallar:
+#  - Yeni/güncellenen hesaplar: IDENTIFIED WITH caching_sha2_password
+#  - password_mismatch_action=update: ALTER USER (native hesaplar da dönüştürülür)
+#  - REVOKE yok; fazla yetkiler raporlanır
+#  - read_only/super_read_only sunuculara yazılmaz (replikasyonla gelir)
+#
+# AAP:
+#   Credential : SSH:uxsqlteam (Machine)
+#   Survey     : aap/surveys/user_check_survey.json ile aynı (12 soru)
+
+- name: Girdileri doğrula ve envanteri oku
+  hosts: localhost
+  gather_facts: false
+  pre_tasks:
+    - name: MySQL admin şifresi survey'den gelmiş olmalı
+      ansible.builtin.assert:
+        that: mysql_admin_password | default('') | length > 0
+        fail_msg: "Survey'deki 'MySQL admin şifresi' alanı boş (mysql_admin_password)."
+        quiet: true
+    - name: Çalışma modu
+      ansible.builtin.debug:
+        msg: "{{ 'CHECK MODE - hiçbir değişiklik yapılmayacak' if ansible_check_mode else 'RUN - plan uygulanacak' }}"
+    - name: Hedef kullanıcı girdileri
+      ansible.builtin.include_role:
+        name: mysql_user_check
+        tasks_from: validate.yml
+  roles:
+    - role: mysql_inventory
+
+- name: Bağlan, kontrol et, uygula, doğrula
+  hosts: mysql_targets
+  gather_facts: false
+  become: false
+  roles:
+    - role: mysql_connectivity
+    - role: mysql_user_check
+    - role: mysql_user_apply
+
+- name: Rapor
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: mysql_report
+      vars:
+        mysqlreport_title: "Faz 4 - MySQL kullanıcı dağıtım raporu"
+        mysqlreport_include_accounts: true
+        mysqlreport_include_apply: true

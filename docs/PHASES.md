@@ -6,8 +6,8 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 |---|---|---|---|
 | 1 | MSSQL envanter okuma, ortam eşleme (DEV/TEST/QA/PROD), dinamik grup, keşif raporu. Hedeflere bağlanmaz. | Yok (salt okunur) | Tamamlandı (63 satır, Type değerleri doğrulandı). Sunucu filtresi tırnak hatası düzeltildi |
 | 2 | SSH (uxsqlteam, become yok) + `mysql -u root` bağlantı testi; durum raporu. Değişiklik yapmaz. | Düşük | Tamamlandı: TEST 23/23 OK (gbapgt08 socket fallback), 2 SKIPPED |
-| 3 | User var mı / şifre aynı mı (hash karşılaştırma) / yetki farkı + native password audit. Değişiklik yapmaz. | Düşük | **Geliştirildi – AAP testi bekleniyor** |
-| 4 | Gerçek CREATE USER / GRANT; şifre farklıysa survey seçimi: `report` (default) / `update`; PROD için ek onay koruması. | Orta-Yüksek | Bekliyor |
+| 3 | User var mı / şifre aynı mı (hash karşılaştırma) / yetki farkı + native password audit. Değişiklik yapmaz. | Düşük | Tamamlandı: TEST 23 sunucu, 17 hesap DIFFERENT / 6 NOT_EXISTS, 141 native hesap |
+| 4 | CREATE USER / GRANT / ALTER USER (update), check mode, read_only ve port uyuşmazlığı koruması, doğrulama. | Orta-Yüksek | **Geliştirildi – AAP check mode testi bekleniyor** |
 | 5 | Konsolide rapor (sunucu bazlı + özet; CSV/HTML artifact), son Job Template + Survey. | Düşük | Bekliyor |
 
 ## Mimari kararlar
@@ -51,4 +51,17 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 15. **`ALL` tespiti:** MySQL 8 `SHOW GRANTS` ALL'u statik yetki listesine açar; sürüme
     göre değişen SUPER/REPLICATION hariç çekirdek liste mevcutsa ALL kabul edilir.
     Dinamik yetkiler (BACKUP_ADMIN vb.) karşılaştırmaya dahil edilmez.
-16. **Öneri (onay bekliyor): Faz 4 yetki geri almaz (REVOKE yok)**; sadece eksikler eklenir, fazlalar raporlanır.
+16. **Faz 4 yetki geri almaz (REVOKE yok, onaylandı)**; sadece eksikler eklenir, fazlalar raporlanır.
+17. **`update` = `ALTER USER ... IDENTIFIED WITH caching_sha2_password`** (onaylandı): native
+    hesaplar şifre güncellenirken dönüştürülür.
+18. **PROD için ek onay alanı yok** (onaylandı). Güvenlik ağı: AAP Check mode.
+19. **Yeni hesaplar açıkça `caching_sha2_password`** ile oluşturulur (sunucu default'u
+    `mysql_native_password`'e ayarlanmış olsa bile).
+20. **read_only/super_read_only sunuculara yazılmaz**: InnoDB Cluster secondary'leri
+    (gbapgaq0x, gbapgq0x) ve replikalar. Primary'deki değişiklik replike olur.
+21. **Port uyuşmazlığında yazılmaz**: socket fallback başka instance'a gitmiş olabilir.
+22. **Tek mysql çağrısı, stdin, her ifade bir satır**: ilk hatada durur, satır no =
+    ifade sırası -> APPLIED / FAILED / NOT_RUN kesin.
+23. **Native audit kategorileri**: CLUSTER_ROUTER_İÇ_HESAP (MySQL Shell/Router ile),
+    ROOT (planlı bakım), UYGULAMA_SERVİS (client uyumluluğu doğrulanıp). Faz 4 yalnızca
+    hedef kullanıcının hesaplarını dönüştürür; audit listesine dokunmaz.

@@ -67,7 +67,7 @@
           - "--connect-timeout={{ mysql_connect_timeout }}"
           - --batch
           - --skip-column-names
-          - --execute=SELECT VERSION(), @@hostname, @@port, CURRENT_USER()
+          - --execute=SELECT VERSION(), @@hostname, @@port, CURRENT_USER(), @@global.read_only, @@global.super_read_only
       register: _mc_tcp
       failed_when: false
       changed_when: false
@@ -83,7 +83,7 @@
           - "--connect-timeout={{ mysql_connect_timeout }}"
           - --batch
           - --skip-column-names
-          - --execute=SELECT VERSION(), @@hostname, @@port, CURRENT_USER()
+          - --execute=SELECT VERSION(), @@hostname, @@port, CURRENT_USER(), @@global.read_only, @@global.super_read_only
       register: _mc_sock
       failed_when: false
       changed_when: false

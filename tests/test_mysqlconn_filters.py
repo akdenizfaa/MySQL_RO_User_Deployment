@@ -116,3 +116,11 @@ def test_report_rows_counts_and_table():
     assert r.mysqlreport_counts(rows) == {"ERROR": 1, "OK": 1, "SKIPPED": 1}
     table = r.mysqlreport_table(rows).splitlines()
     assert table[0].startswith("SERVER") and len(table) == 5
+
+
+def test_read_only_detected():
+    rec = c.mysqlconn_classify(SSH_OK, CLIENT_OK, run(0, "8.0.36\th\t3306\troot@localhost\t1\t1"), SKIP, 3306)
+    assert rec["status"] == "OK" and rec["read_only"] is True
+    assert "read_only" in rec["detail"]
+    rec = c.mysqlconn_classify(SSH_OK, CLIENT_OK, run(0, "8.0.36\th\t3306\troot@localhost\t0\t0"), SKIP, 3306)
+    assert rec["read_only"] is False and rec["detail"] == ""

@@ -36,12 +36,11 @@
     - name: Hesap tablosu
       ansible.builtin.debug:
         msg: >-
-          {{ mysqlreport_accounts | mysqlreport_lines(['server', 'environment', 'account', 'status',
-              'plugin', 'password', 'missing', 'flags', 'planned']) }}
+          {{ mysqlreport_accounts | mysqlreport_lines(mysqlreport_account_columns) }}
 
     - name: Audit - mysql_native_password kullanan hesaplar (düzeltilmeli)
       ansible.builtin.debug:
-        msg: "{{ mysqlreport_native | mysqlreport_lines(['server', 'environment', 'account', 'issue']) }}"
+        msg: "{{ mysqlreport_native | mysqlreport_lines(['server', 'environment', 'account', 'category', 'issue']) }}"
 
     - name: Hesap özetini hesapla
       ansible.builtin.set_fact:
@@ -49,12 +48,38 @@
           {{ mysqlreport_summary | combine({
                'accounts_by_status': mysqlreport_accounts | mysqlreport_counts,
                'native_password_account_count': mysqlreport_native | length,
+               'native_password_by_category': mysqlreport_native | mysqlreport_count_by('category'),
                'native_password_servers': mysqlreport_native | map(attribute='server') | unique | list,
                'failed_servers': (mysqlreport_summary.failed_servers
                                   + (mysqlreport_accounts | selectattr('status', 'eq', 'QUERY_ERROR')
                                      | map(attribute='server') | list)) | unique | list }) }}
 
     - name: Hesap özeti
+      ansible.builtin.debug:
+        var: mysqlreport_summary
+
+- name: Uygulama raporu (Faz 4)
+  when: mysqlreport_include_apply | bool
+  block:
+    - name: İfade bazlı sonuçları oluştur
+      ansible.builtin.set_fact:
+        mysqlreport_apply: "{{ groups['mysql_targets'] | default([]) | mysqlreport_apply_rows(hostvars) }}"
+
+    - name: Uygulama tablosu (SQL maskeli)
+      ansible.builtin.debug:
+        msg: "{{ mysqlreport_apply | mysqlreport_lines(['server', 'environment', 'account', 'statement', 'result', 'error']) }}"
+
+    - name: Uygulama özetini ekle
+      ansible.builtin.set_fact:
+        mysqlreport_summary: >-
+          {{ mysqlreport_summary | combine({
+               'mode': 'CHECK' if ansible_check_mode else 'RUN',
+               'statements_by_result': mysqlreport_apply | mysqlreport_count_by('result'),
+               'failed_servers': (mysqlreport_summary.failed_servers
+                                  + (mysqlreport_apply | selectattr('result', 'in', ['FAILED', 'UNKNOWN'])
+                                     | map(attribute='server') | list)) | unique | list }) }}
+
+    - name: Uygulama özeti
       ansible.builtin.debug:
         var: mysqlreport_summary
 
@@ -65,6 +90,7 @@
       mysqlreport_data: "{{ mysqlreport_data }}"
       mysqlreport_accounts: "{{ mysqlreport_accounts | default([]) }}"
       mysqlreport_native: "{{ mysqlreport_native | default([]) }}"
+      mysqlreport_apply: "{{ mysqlreport_apply | default([]) }}"
     per_host: false
 
 - name: Başarısız sunucu varsa job'ı FAILED işaretle

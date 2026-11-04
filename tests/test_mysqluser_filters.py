@@ -124,16 +124,20 @@ def test_evaluate_all_statuses():
     by = {a["account"]: a for a in res["accounts"]}
 
     assert by["app@%"]["status"] == "EXISTS_PASSWORD_MATCH"
-    assert by["app@%"]["missing_privileges"] == [] and by["app@%"]["planned_actions"] == []
+    assert by["app@%"]["missing_privileges"] == [] and by["app@%"]["statements"] == []
 
     a = by["app@10.230.%"]
     assert a["status"] == "EXISTS_PASSWORD_DIFFERENT"
     assert "NATIVE_PASSWORD_DÜZELTİLMELİ" in a["flags"] and "ACCOUNT_LOCKED" in a["flags"]
-    assert a["planned_actions"][0] == "YOK (sadece rapor)"
+    assert "ŞİFRE_FARKLI_SADECE_RAPOR" in a["flags"]                   # report modu: ALTER yok
+    assert [st["kind"] for st in a["statements"]] == ["GRANT"]
     assert a["missing_privileges"] == ["SELECT", "SHOW VIEW"]
 
-    assert by["app@10.236.%"]["status"] == "NOT_EXISTS"
-    assert by["app@10.236.%"]["planned_actions"][0] == "CREATE USER"
+    n = by["app@10.236.%"]
+    assert n["status"] == "NOT_EXISTS"
+    assert n["planned_actions"] == [
+        "CREATE USER 'app'@'10.236.%' IDENTIFIED WITH caching_sha2_password BY '********'",
+        "GRANT SELECT, SHOW VIEW ON *.* TO 'app'@'10.236.%'"]
     assert by["app@10.99.%"]["status"] == "EXTRA_ACCOUNT"
     assert res["native_password_accounts"] == ["app@10.230.%", "legacy@localhost"]
 
@@ -146,7 +150,9 @@ def test_evaluate_update_and_grant_option():
     a = u.mysqluser_evaluate(inputs, parsed, grants, "baska")["accounts"][0]
     assert a["status"] == "EXISTS_PASSWORD_DIFFERENT"
     assert a["missing_privileges"] == []                      # ALL açılmış hali tanındı
-    assert a["planned_actions"] == ["ALTER USER (şifre güncelle)", "GRANT OPTION ekle"]
+    assert a["planned_actions"] == [
+        "ALTER USER 'app'@'%' IDENTIFIED WITH caching_sha2_password BY '********'",
+        "GRANT USAGE ON *.* TO 'app'@'%' WITH GRANT OPTION"]
 
 
 def test_evaluate_existing_grant_option_is_flag_only():
@@ -156,6 +162,35 @@ def test_evaluate_existing_grant_option_is_flag_only():
     grants = u.mysqluser_parse_grants("GRANT SELECT, SHOW VIEW ON *.* TO `app`@`%` WITH GRANT OPTION")
     a = u.mysqluser_evaluate(inputs, parsed, grants, "a")["accounts"][0]
     assert a["flags"] == ["MEVCUT_GRANT_OPTION"] and a["planned_actions"] == []
+
+
+def test_extra_privileges_reported_not_revoked():
+    inputs = u.mysqluser_validate("app", True, "%", ["readonly"], "report")
+    parsed = {"accounts": [{"user": "app", "host": "%", "plugin": "caching_sha2_password",
+                            "auth_hex": _vec("caching_sha2_password", "a")}], "native": []}
+    grants = u.mysqluser_parse_grants("GRANT SELECT, SHOW VIEW, INSERT, DROP ON *.* TO `app`@`%`\n"
+                                      "GRANT ALL PRIVILEGES ON `crm`.* TO `app`@`%`")
+    a = u.mysqluser_evaluate(inputs, parsed, grants, "a")["accounts"][0]
+    assert a["extra_privileges"] == ["INSERT", "DROP"]
+    assert a["other_grants"] == ["GRANT ALL PRIVILEGES ON `crm`.* TO `app`@`%`"]
+    assert "FAZLA_YETKİ" in a["flags"] and a["statements"] == []      # REVOKE yok
+
+
+def test_native_with_update_converts_plugin():
+    inputs = u.mysqluser_validate("app", True, "%", ["readonly"], "update")
+    parsed = {"accounts": [{"user": "app", "host": "%", "plugin": "mysql_native_password",
+                            "auth_hex": _vec("mysql_native_password", "a")}], "native": []}
+    grants = u.mysqluser_parse_grants("GRANT SELECT, SHOW VIEW ON *.* TO `app`@`%`")
+    a = u.mysqluser_evaluate(inputs, parsed, grants, "yeni")["accounts"][0]
+    assert a["statements"][0]["template"] == (
+        "ALTER USER 'app'@'%' IDENTIFIED WITH caching_sha2_password BY " + u.PW_TOKEN)
+
+
+def test_render_inserts_escaped_password_only_at_apply():
+    t = "CREATE USER 'a'@'%' IDENTIFIED WITH caching_sha2_password BY " + u.PW_TOKEN
+    assert u.mysqluser_render(t, "x'y\\z") == t.replace(u.PW_TOKEN, "'x\\'y\\\\z'") + ";"
+    with pytest.raises(ValueError):
+        u.mysqluser_render(t, "a\nb")
 
 
 # ---------------------------------------------------------------- report

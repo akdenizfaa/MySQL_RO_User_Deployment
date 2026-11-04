@@ -43,3 +43,4 @@
       vars:
         mysqlreport_title: "Faz 3 - MySQL kullanıcı kontrol ve audit raporu"
         mysqlreport_include_accounts: true
+        mysqlreport_account_columns: [server, environment, account, status, plugin, password, missing, extra, flags, planned]

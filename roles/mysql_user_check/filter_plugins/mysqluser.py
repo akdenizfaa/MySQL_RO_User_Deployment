@@ -267,57 +267,96 @@ def mysqluser_password_matches(password, plugin, auth_hex):
 
 
 # ---------------------------------------------------------------------------
-# Değerlendirme
+# Değerlendirme + Faz 4 SQL planı
 # ---------------------------------------------------------------------------
+PW_TOKEN = "__TARGET_PASSWORD__"
+AUTH_PLUGIN = "caching_sha2_password"   # yeni/güncellenen hesaplar her zaman bu plugin
+
+
+def _has_all(cur):
+    return "ALL PRIVILEGES" in cur or CORE_ALL_PRIVILEGES <= cur
+
+
 def _missing(desired, current):
     cur = set(current.get("global_privs", []))
     if desired["all"]:
-        ok = "ALL PRIVILEGES" in cur or CORE_ALL_PRIVILEGES <= cur
-        return [] if ok else ["ALL PRIVILEGES"]
-    if "ALL PRIVILEGES" in cur or CORE_ALL_PRIVILEGES <= cur:
+        return [] if _has_all(cur) else ["ALL PRIVILEGES"]
+    if _has_all(cur):
         return []
     return [p for p in desired["privileges"] if p not in cur]
 
 
-def mysqluser_evaluate(inputs, parsed, grants, password):
-    """Hesap bazlı sonuç listesi + sunucu audit'i.
+def _extra(desired, current):
+    """Seçilenden fazla *.* yetkileri (REVOKE edilmez, sadece raporlanır)."""
+    if desired["all"]:
+        return []
+    cur = [p for p in current.get("global_privs", []) if p != "USAGE"]
+    if _has_all(set(cur)):
+        return ["ALL PRIVILEGES"]
+    return [p for p in cur if p not in desired["privileges"]]
 
-    inputs : mysqluser_validate çıktısı
-    parsed : mysqluser_parse_accounts çıktısı
-    grants : mysqluser_parse_grants çıktısı
+
+def _other_grants(current):
+    """*.* dışındaki grant satırları (şema/tablo seviyesi) - bilgi amaçlı."""
+    return [g for g in current.get("raw", [])
+            if " ON *.* TO " not in g and not g.startswith("GRANT PROXY ON ``@``")]
+
+
+def _acct(user, host):
+    return "%s@%s" % (_q(user), _q(host))
+
+
+def _stmt(kind, template):
+    return {"kind": kind, "template": template, "masked": template.replace(PW_TOKEN, "'********'")}
+
+
+def mysqluser_evaluate(inputs, parsed, grants, password):
+    """Hesap bazlı sonuç + Faz 4 SQL planı + sunucu audit'i.
+
+    Her hesapta 'statements': [{kind, template, masked}]. template içinde şifre
+    yerine PW_TOKEN bulunur; gerçek SQL yalnızca uygulama anında
+    mysqluser_render ile (no_log task içinde) üretilir.
     """
     desired = mysqluser_desired(inputs["privilege_sets"])
+    user = inputs["user"]
     existing = {a["host"].lower(): a for a in parsed.get("accounts", [])}
+    grant_suffix = " WITH GRANT OPTION" if desired["grant_option"] else ""
     results = []
 
     for host in inputs["hosts"]:
-        account = "%s@%s" % (inputs["user"], host)
         acc = existing.get(host.lower())
-        res = {"account": account, "host": host, "plugin": "", "password": "",
-               "missing_privileges": [], "current_privileges": [], "flags": [],
-               "planned_actions": []}
+        acct = _acct(user, host)
+        res = {"account": "%s@%s" % (user, host), "host": host, "plugin": "", "password": "",
+               "missing_privileges": [], "extra_privileges": [], "other_grants": [],
+               "current_privileges": [], "flags": [], "statements": []}
+
         if acc is None:
             res["status"] = "NOT_EXISTS"
             res["missing_privileges"] = list(desired["privileges"])
-            res["planned_actions"] = ["CREATE USER", "GRANT %s%s" % (
-                ", ".join(desired["privileges"]), " WITH GRANT OPTION" if desired["grant_option"] else "")]
+            res["statements"] = [
+                _stmt("CREATE_USER", "CREATE USER %s IDENTIFIED WITH %s BY %s"
+                      % (acct, AUTH_PLUGIN, PW_TOKEN)),
+                _stmt("GRANT", "GRANT %s ON *.* TO %s%s"
+                      % (", ".join(desired["privileges"]), acct, grant_suffix)),
+            ]
             results.append(res)
             continue
 
         res["plugin"] = acc["plugin"]
         match = mysqluser_password_matches(password, acc["plugin"], acc.get("auth_hex"))
         if match is None:
-            res["status"] = "UNSUPPORTED_PLUGIN"
-            res["password"] = "UNKNOWN"
+            res["status"], res["password"] = "UNSUPPORTED_PLUGIN", "UNKNOWN"
         elif match:
-            res["status"] = "EXISTS_PASSWORD_MATCH"
-            res["password"] = "MATCH"
+            res["status"], res["password"] = "EXISTS_PASSWORD_MATCH", "MATCH"
         else:
-            res["status"] = "EXISTS_PASSWORD_DIFFERENT"
-            res["password"] = "DIFFERENT"
-            res["planned_actions"].append(
-                "ALTER USER (şifre güncelle)" if inputs["mismatch_action"] == "update"
-                else "YOK (sadece rapor)")
+            res["status"], res["password"] = "EXISTS_PASSWORD_DIFFERENT", "DIFFERENT"
+            if inputs["mismatch_action"] == "update":
+                # IDENTIFIED WITH caching_sha2_password: native hesaplar da dönüştürülür
+                res["statements"].append(_stmt(
+                    "ALTER_USER_PASSWORD", "ALTER USER %s IDENTIFIED WITH %s BY %s"
+                    % (acct, AUTH_PLUGIN, PW_TOKEN)))
+            else:
+                res["flags"].append("ŞİFRE_FARKLI_SADECE_RAPOR")
 
         if acc["plugin"] == "mysql_native_password":
             res["flags"].append("NATIVE_PASSWORD_DÜZELTİLMELİ")
@@ -326,32 +365,49 @@ def mysqluser_evaluate(inputs, parsed, grants, password):
         if acc.get("password_expired"):
             res["flags"].append("PASSWORD_EXPIRED")
 
-        cur = grants.get("%s@%s" % (inputs["user"], host.lower()), {})
+        cur = grants.get("%s@%s" % (user, host.lower()), {})
         res["current_privileges"] = cur.get("global_privs", [])
         res["missing_privileges"] = _missing(desired, cur)
+        res["extra_privileges"] = _extra(desired, cur)
+        res["other_grants"] = _other_grants(cur)
+        need_go = desired["grant_option"] and not cur.get("grant_option")
         if res["missing_privileges"]:
-            res["planned_actions"].append("GRANT %s" % ", ".join(res["missing_privileges"]))
-        if desired["grant_option"] and not cur.get("grant_option"):
-            res["planned_actions"].append("GRANT OPTION ekle")
+            res["statements"].append(_stmt("GRANT", "GRANT %s ON *.* TO %s%s" % (
+                ", ".join(res["missing_privileges"]), acct, " WITH GRANT OPTION" if need_go else "")))
+        elif need_go:
+            res["statements"].append(_stmt(
+                "GRANT", "GRANT USAGE ON *.* TO %s WITH GRANT OPTION" % acct))
         if cur.get("grant_option") and not desired["grant_option"]:
-            res["flags"].append("MEVCUT_GRANT_OPTION")   # bilgi: Faz 4 yetki geri almaz
+            res["flags"].append("MEVCUT_GRANT_OPTION")
+        if res["extra_privileges"] or res["other_grants"]:
+            res["flags"].append("FAZLA_YETKİ")
         results.append(res)
 
     requested = set(h.lower() for h in inputs["hosts"])
     for host, acc in sorted(existing.items()):
         if host not in requested:
+            cur = grants.get("%s@%s" % (user, host), {})
             results.append({
-                "account": "%s@%s" % (inputs["user"], acc["host"]), "host": acc["host"],
+                "account": "%s@%s" % (user, acc["host"]), "host": acc["host"],
                 "status": "EXTRA_ACCOUNT", "plugin": acc["plugin"], "password": "",
-                "missing_privileges": [], "current_privileges":
-                    grants.get("%s@%s" % (inputs["user"], host), {}).get("global_privs", []),
+                "missing_privileges": [], "extra_privileges": [], "other_grants": _other_grants(cur),
+                "current_privileges": cur.get("global_privs", []),
                 "flags": ["SURVEY_HOST_LISTESİNDE_YOK"]
                 + (["NATIVE_PASSWORD_DÜZELTİLMELİ"] if acc["plugin"] == "mysql_native_password" else []),
-                "planned_actions": ["YOK (bilgi)"],
+                "statements": [],
             })
 
+    for r in results:
+        r["planned_actions"] = [st["masked"] for st in r["statements"]]
     native = ["%s@%s" % (n["user"], n["host"]) for n in parsed.get("native", [])]
     return {"accounts": results, "native_password_accounts": native}
+
+
+def mysqluser_render(template, password):
+    """Uygulama anında gerçek SQL (yalnızca no_log task içinde kullanılır)."""
+    if "\n" in str(password) or "\r" in str(password):
+        raise ValueError("Şifre satır sonu içeremez")
+    return template.replace(PW_TOKEN, _q(password)) + ";"
 
 
 class FilterModule(object):
@@ -365,4 +421,5 @@ class FilterModule(object):
             "mysqluser_parse_grants": mysqluser_parse_grants,
             "mysqluser_password_matches": mysqluser_password_matches,
             "mysqluser_evaluate": mysqluser_evaluate,
+            "mysqluser_render": mysqluser_render,
         }

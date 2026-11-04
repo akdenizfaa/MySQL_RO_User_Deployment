@@ -25,12 +25,15 @@ inventory/localhost.yml               # sadece controller; hedefler runtime'da e
 inventory_read.yml                    # FAZ 1: envanter keşfi
 connectivity_check.yml                # FAZ 2: SSH + MySQL bağlantı testi ve rapor
 user_check.yml                        # FAZ 3: kullanıcı/şifre/yetki kontrolü + native password audit
+user_deploy.yml                       # FAZ 4: oluştur / yetki ver / şifre güncelle (+ check mode)
 roles/mysql_inventory/                # MSSQL okuma + ortam eşleme + add_host
   filter_plugins/mysqlinv.py
 roles/mysql_connectivity/             # host başına SSH/client/MySQL testi
   filter_plugins/mysqlconn.py         # durum sınıflandırma + option file üretimi
 roles/mysql_user_check/               # hesap okuma, hash karşılaştırma, yetki farkı
   filter_plugins/mysqluser.py
+roles/mysql_user_apply/               # planı uygula (stdin), sonuç ayrıştırma, doğrulama
+  filter_plugins/mysqlapply.py
 roles/mysql_report/                   # konsolide tablo + özet + set_stats
   filter_plugins/mysqlreport.py
 aap/surveys/                          # Survey spec (JSON)
@@ -130,6 +133,33 @@ Hesap durumları (her `'user'@'host'` için):
 
 **Audit:** her sunucudaki tüm `mysql_native_password` hesapları ayrı tabloda
 "düzeltilmeli" olarak listelenir (8.4'te bu plugin varsayılan olarak kapalıdır).
+
+## Faz 4 – Dağıtım (değişiklik yapar)
+
+Job Template: `MySQL - User Deploy`
+- Playbook: `user_deploy.yml`, Credential: **SSH:uxsqlteam**, EE: aynı
+- Survey: `aap/surveys/user_deploy_survey.json` (Faz 3 ile aynı 12 soru)
+- **Job Type → Prompt on launch** işaretleyin. Önce **Check**, sonra **Run**.
+
+| Kural | Davranış |
+|---|---|
+| Check mode | Hiçbir SQL çalışmaz; plan (şifre maskeli) ve beklenen sonuç raporlanır |
+| Yeni hesap | `CREATE USER ... IDENTIFIED WITH caching_sha2_password` + `GRANT ... ON *.*` |
+| Şifre farklı + `update` | `ALTER USER ... IDENTIFIED WITH caching_sha2_password` (native hesap dönüştürülür) |
+| Şifre farklı + `report` | İşlem yok, `ŞİFRE_FARKLI_SADECE_RAPOR` |
+| Eksik yetki | Sadece eksikler `GRANT` edilir |
+| Fazla yetki | **REVOKE yok**; `extra` sütununda ve `FAZLA_YETKİ` işaretiyle raporlanır |
+| `read_only` / `super_read_only` | Yazılmaz (`SKIPPED_READ_ONLY`); primary'den replike olur, doğrulama replikayı da kontrol eder |
+| Envanter portu ≠ `@@port` | Yazılmaz (`SKIPPED_PORT_MISMATCH`): socket başka instance'a bağlanmış olabilir |
+| SQL hatası | İlk hatada durur; ifade bazlı `APPLIED` / `FAILED` / `NOT_RUN`, job FAILED |
+| Doğrulama | Uygulamadan sonra Faz 3 kontrolü tekrar çalışır, `post` sütununa yazılır |
+
+Güvenlik: hedef şifre SQL'e yalnızca uygulama anında, `no_log` task'ın **stdin**'inde
+eklenir (komut satırında/`ps`'te görünmez); rapordaki SQL'de `'********'` görünür.
+MySQL binlog/general log'a `CREATE/ALTER USER` şifreleri hash'li yazılır.
+
+**InnoDB Cluster / replikasyon:** Primary üzerindeki değişiklik secondary'lere replike
+olur. Survey'de tüm üyeler seçilse bile yalnızca yazılabilir üye (primary) değiştirilir.
 
 ## Sorun giderme
 

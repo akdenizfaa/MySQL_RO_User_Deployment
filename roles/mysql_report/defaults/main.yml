@@ -6,3 +6,7 @@ mysqlreport_result_var: mysqlconn
 mysqlreport_fail_on_error: true
 # Faz 3 hesap tablosu + native password audit
 mysqlreport_include_accounts: false
+# Faz 4 ifade bazlı uygulama tablosu
+mysqlreport_include_apply: false
+# Hesap tablosu sütunları (Faz 4'te apply/post dolu, Faz 3'te '-'/boş)
+mysqlreport_account_columns: [server, environment, account, status, plugin, password, missing, extra, flags, planned, apply, post]

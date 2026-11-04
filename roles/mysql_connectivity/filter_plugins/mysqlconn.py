@@ -61,7 +61,7 @@ def mysqlconn_classify(ssh, client, tcp, sock, expected_port=None):
     rec = {
         "status": "PENDING", "detail": "", "client": "", "method": "",
         "version": "", "server_hostname": "", "server_port": "",
-        "current_user": "", "port_mismatch": False,
+        "current_user": "", "port_mismatch": False, "read_only": False,
     }
 
     # 1) SSH
@@ -100,9 +100,12 @@ def mysqlconn_classify(ssh, client, tcp, sock, expected_port=None):
     rec["method"] = method
     if final.get("rc") == 0:
         cols = (str(final.get("stdout", "")).strip().splitlines() or [""])[-1].split("\t")
-        cols += [""] * (4 - len(cols))
+        cols += [""] * (6 - len(cols))
         rec.update(status="OK", version=cols[0], server_hostname=cols[1],
-                   server_port=cols[2], current_user=cols[3])
+                   server_port=cols[2], current_user=cols[3],
+                   # read_only veya super_read_only: replika / Group Replication secondary.
+                   # Faz 4 bu sunuculara yazmaz; değişiklik primary'den replike olur.
+                   read_only=(cols[4] == "1" or cols[5] == "1"))
         notes = []
         if method == "socket" and _ran(tcp):
             _, code, _ = _mysql_error(tcp)
@@ -110,6 +113,8 @@ def mysqlconn_classify(ssh, client, tcp, sock, expected_port=None):
         if expected_port and cols[2] and str(cols[2]) != str(expected_port):
             rec["port_mismatch"] = True
             notes.append("Envanter portu %s, sunucu @@port %s" % (expected_port, cols[2]))
+        if rec["read_only"]:
+            notes.append("read_only (replika/secondary): yazma yapılmaz")
         rec["detail"] = "; ".join(notes)
         return rec
 
