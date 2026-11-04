@@ -39,5 +39,8 @@ mysqlinv_ssh_port: 22
 target_environments: []        # ['TEST','PROD'] veya "TEST,PROD"
 target_servers: ""             # opsiyonel: "gbarkt02,gbarkt04"
 
+# Hedef 0 ise job FAILED olsun (sessiz "başarılı" sonucu engeller)
+mysqlinv_fail_on_no_targets: true
+
 # Test için: tanımlıysa MSSQL yerine bu JSON dosyasından satır okunur
 mysqlinv_mock_file: ""

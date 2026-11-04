@@ -47,12 +47,21 @@ def mysqlinv_envs(value):
 
 
 def mysqlinv_list(value):
-    """Opsiyonel sunucu filtresi (virgül/satır ayrımlı) -> küçük harf liste."""
+    """Opsiyonel sunucu filtresi (virgül/satır ayrımlı) -> küçük harf liste.
+
+    Survey'den gelen '""', "''" gibi tırnak artıkları temizlenir; aksi halde
+    filtre hiçbir sunucuyla eşleşmez ve hedef listesi sessizce boş kalır.
+    """
     if not value:
         return []
     if isinstance(value, str):
         value = re.split(r"[,\n;\s]+", value)
-    return [_s(v).lower() for v in value if _s(v)]
+    out = []
+    for v in value:
+        item = _s(v).strip("\"'").strip().lower()
+        if item and item not in out:
+            out.append(item)
+    return out
 
 
 def mysqlinv_normalize(rows, env_type_map, default_port=3316):
@@ -114,7 +123,8 @@ def mysqlinv_normalize(rows, env_type_map, default_port=3316):
 def mysqlinv_select(records, environments, servers=None):
     """Seçilen ortam(lar) + opsiyonel sunucu filtresine göre ayır.
 
-    Dönen: {'targets': [...], 'skipped': [{name, environment, reason}]}
+    Dönen: {'targets': [...], 'skipped': [{name, environment, reason}],
+            'not_found': [envanterde olmayan filtre adları]}
     Sadece seçilen ortamlara ait (veya UNMAPPED) kayıtlar raporlanır;
     seçim dışı ortamlar sessizce elenir (rapor şişmesin).
     """
@@ -135,7 +145,9 @@ def mysqlinv_select(records, environments, servers=None):
                                 reason="; ".join(rec["issues"])))
         else:
             targets.append(rec)
-    return {"targets": targets, "skipped": skipped}
+    known = set(r["name"].lower() for r in records or [])
+    not_found = sorted(server_filter - known)
+    return {"targets": targets, "skipped": skipped, "not_found": not_found}
 
 
 def mysqlinv_count_by_env(records, environments):

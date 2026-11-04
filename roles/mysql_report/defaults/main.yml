@@ -1,0 +1,6 @@
+---
+mysqlreport_title: "MySQL bağlantı raporu"
+mysqlreport_result_var: mysqlconn
+# OK ve SKIPPED dışında bir durum varsa job FAILED olsun (AAP'de görünür olsun).
+# Rapor her durumda önce basılır.
+mysqlreport_fail_on_error: true

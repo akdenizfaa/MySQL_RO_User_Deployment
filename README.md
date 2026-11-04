@@ -10,9 +10,9 @@ Faz planı ve mimari kararlar: [docs/PHASES.md](docs/PHASES.md)
 
 ```
 AAP (EE container) ──pymssql──► PGARSQLTEM01,1453 (MysqlInventory)   # envanter okuma
-AAP (EE container) ──SSH:22──► MySQL sunucusu (ListeningIP)
-                                └─ dzdo su - mysql
-                                    └─ mysql -u root (lokal, port 3316)   # Faz 2+
+AAP (EE container) ──SSH:22 (uxsqlteam)──► MySQL sunucusu (ListeningIP)
+                                └─ mysql --defaults-extra-file=<0600 geçici dosya> -u root
+                                     -h 127.0.0.1 -P <ListeningPort>   (auto: hata olursa socket)
 ```
 
 ## Yapı
@@ -22,9 +22,14 @@ ansible.cfg
 collections/requirements.yml          # AAP project sync bunu otomatik kurar
 execution-environment/                # ansible-builder tanımı (pymssql)
 inventory/localhost.yml               # sadece controller; hedefler runtime'da eklenir
-inventory_read.yml                    # FAZ 1 giriş noktası (roles/ ile yan yana olmalı)
+inventory_read.yml                    # FAZ 1: envanter keşfi
+connectivity_check.yml                # FAZ 2: SSH + MySQL bağlantı testi ve rapor
 roles/mysql_inventory/                # MSSQL okuma + ortam eşleme + add_host
-  filter_plugins/mysqlinv.py          # normalize/seçim mantığı (unit-test'li)
+  filter_plugins/mysqlinv.py
+roles/mysql_connectivity/             # host başına SSH/client/MySQL testi
+  filter_plugins/mysqlconn.py         # durum sınıflandırma + option file üretimi
+roles/mysql_report/                   # konsolide tablo + özet + set_stats
+  filter_plugins/mysqlreport.py
 aap/surveys/                          # Survey spec (JSON)
 tests/                                # pytest + mock envanter
 ```
@@ -56,8 +61,39 @@ görebilirsiniz. Ekibinizde zaten `pymssql` içeren bir EE varsa onu kullanın.
 6. Çalıştırın. Çıktıda `mysqlinv_summary` (okunan satır, bulunan Type değerleri,
    ortam başına hedef sayısı), `mysqlinv_skipped` (elenenler + neden) ve hedef listesi görünür.
 
+## Faz 2 – Bağlantı testi (değişiklik yapmaz)
+
+Job Template: `MySQL - Connectivity Check`
+- Playbook: `connectivity_check.yml`
+- Execution Environment: Faz 1 ile aynı
+- Credentials: **SSH:uxsqlteam** (Machine). Credential'da *Privilege Escalation* alanı
+  dolu olsa bile playbook `become: false` ile çalışır; dzdo kullanılmaz.
+- Survey: `aap/surveys/connectivity_check_survey.json` (7 soru)
+- Önerilen ilk çalıştırma: TEST + tek sunucu filtresi.
+
+Her sunucu için adımlar ve durum kodları:
+
+| Adım | Başarısızlıkta durum |
+|---|---|
+| SSH (`raw: echo`) | `SSH_UNREACHABLE` / `SSH_AUTH_FAIL` |
+| Komut çalıştırma (python) | `HOST_ERROR` |
+| mysql client bulma (login shell PATH + bilinen yollar) | `MYSQL_CLIENT_NOT_FOUND` |
+| `SELECT VERSION(), @@hostname, @@port, CURRENT_USER()` | `MYSQL_AUTH_FAIL` (1045) / `MYSQL_UNREACHABLE` (2002/2003/2013) / `MYSQL_ERROR` |
+| Hepsi başarılı | `OK` (socket'e düşüldüyse veya port uyuşmuyorsa `warning_servers` listesinde) |
+
+Envanterde elenenler (`isActive=0` vb.) `SKIPPED` olarak tabloda yer alır.
+`OK`/`SKIPPED` dışında durum varsa rapor basıldıktan sonra job **FAILED** olur
+(`mysqlreport_fail_on_error: false` ile kapatılabilir).
+
+Güvenlik: root şifresi komut satırında geçmez (`ps` ile görünmez). Sunucuda
+`/tmp` altında 0600 izinli geçici bir option file oluşturulur, iş bitince her
+durumda (hata olsa da) silinir. İlgili task `no_log: true`.
+
 ## Sorun giderme
 
+- **Hedef sayısı 0 / "Seçilen kriterlere uyan hedef sunucu yok"**: Sunucu filtresi
+  alanına tırnak (`""`) yazmayın, boş bırakın. Envanterde olmayan adlar
+  `server_filter_not_found` alanında listelenir.
 - **`the role 'mysql_inventory' was not found`**: Playbook'lar repo kökünde
   tutulur; Ansible rolleri playbook'un yanındaki `roles/` klasöründe arar. Bu düzen
   AAP'nin `ansible.cfg`'yi okuyup okumamasından bağımsız çalışır.
@@ -84,3 +120,6 @@ ansible-playbook inventory_read.yml \
   -e '{"target_environments":["TEST","PROD"]}' \
   -e mysqlinv_mock_file=$PWD/tests/fixtures/inventory_sample.json
 ```
+
+Faz 2 lab testi: `tests/fixtures/phase2_lab.json` 127.0.0.x adresleriyle SSH/MySQL
+senaryolarını içerir (lokal sshd + MySQL/MariaDB 3316 gerekir).

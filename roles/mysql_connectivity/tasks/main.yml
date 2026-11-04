@@ -1,0 +1,109 @@
+---
+# Her hedef sunucu için çalışır. Hiçbir adım sunucuda kalıcı değişiklik yapmaz.
+# Hiçbir adım job'ı durdurmaz: tüm hatalar 'mysqlconn' kaydına yazılır ve
+# raporlama play'inde toplanır. Bu yüzden failed_when: false / ignore_* kullanılır.
+#
+# Çıktı (host fact): mysqlconn = {status, detail, client, method, version, ...}
+
+- name: "1/4 SSH bağlantısı"
+  ansible.builtin.raw: echo SSH_OK      # raw: python gerektirmez, sadece SSH'ı test eder
+  register: _mc_ssh
+  ignore_unreachable: true
+  ignore_errors: true
+  changed_when: false
+  check_mode: false
+
+- name: "2/4 mysql client'ı bul (login shell PATH + bilinen yollar)"
+  ansible.builtin.shell: |
+    p=$(bash -lc 'command -v mysql' 2>/dev/null | tail -n1)
+    if [ -n "$p" ] && [ -x "$p" ]; then echo "$p"; exit 0; fi
+    for c in {{ mysql_client_candidates | map('quote') | join(' ') }}; do
+      if [ -x "$c" ]; then echo "$c"; exit 0; fi
+    done
+    exit 3
+  args:
+    executable: /bin/bash
+  register: _mc_client
+  failed_when: false
+  changed_when: false
+  check_mode: false
+  when:
+    - _mc_ssh is not unreachable
+    - "'SSH_OK' in (_mc_ssh.stdout | default(''))"
+
+- name: "3/4 MySQL'e bağlan ve sürümü oku"
+  when:
+    - _mc_client is not skipped
+    - (_mc_client.rc | default(1)) == 0
+  block:
+    # Şifre komut satırında geçmez (ps çıktısında görünürdü). 0600 geçici
+    # option file kullanılır ve 'always' ile her durumda silinir.
+    - name: Geçici client option file oluştur
+      ansible.builtin.tempfile:
+        state: file
+        path: "{{ mysql_tmp_dir }}"
+        prefix: ".ans_mycnf_"
+      register: _mc_cnf
+      changed_when: false
+      check_mode: false
+
+    - name: Kimlik bilgisini option file'a yaz
+      ansible.builtin.copy:
+        dest: "{{ _mc_cnf.path }}"
+        mode: "0600"
+        content: "{{ mysql_admin_password | mysqlconn_cnf(mysql_admin_user) }}"
+      no_log: true
+      changed_when: false
+      check_mode: false
+
+    - name: TCP ile bağlan (127.0.0.1:{{ mysql_port }})
+      ansible.builtin.command:
+        argv:
+          - "{{ _mc_client.stdout_lines | last }}"
+          - "--defaults-extra-file={{ _mc_cnf.path }}"   # ilk argüman olmak zorunda
+          - --protocol=TCP
+          - --host=127.0.0.1
+          - "--port={{ mysql_port }}"
+          - "--connect-timeout={{ mysql_connect_timeout }}"
+          - --batch
+          - --skip-column-names
+          - --execute=SELECT VERSION(), @@hostname, @@port, CURRENT_USER()
+      register: _mc_tcp
+      failed_when: false
+      changed_when: false
+      check_mode: false
+      when: mysql_connect_method in ['tcp', 'auto']
+
+    - name: Socket ile bağlan (socket modu veya TCP auth/port hatası)
+      ansible.builtin.command:
+        argv:
+          - "{{ _mc_client.stdout_lines | last }}"
+          - "--defaults-extra-file={{ _mc_cnf.path }}"
+          - --protocol=SOCKET
+          - "--connect-timeout={{ mysql_connect_timeout }}"
+          - --batch
+          - --skip-column-names
+          - --execute=SELECT VERSION(), @@hostname, @@port, CURRENT_USER()
+      register: _mc_sock
+      failed_when: false
+      changed_when: false
+      check_mode: false
+      when: "_mc_tcp | default({'skipped': true}) | mysqlconn_should_fallback(mysql_connect_method)"
+
+  always:
+    - name: Geçici option file'ı sil
+      ansible.builtin.file:
+        path: "{{ _mc_cnf.path }}"
+        state: absent
+      changed_when: false
+      check_mode: false
+      when: _mc_cnf.path is defined
+
+- name: "4/4 Sonucu sınıflandır"
+  ansible.builtin.set_fact:
+    mysqlconn: >-
+      {{ _mc_ssh | mysqlconn_classify(
+           _mc_client | default({}),
+           _mc_tcp | default({'skipped': true}),
+           _mc_sock | default({'skipped': true}),
+           mysql_port) }}

@@ -1,0 +1,42 @@
+---
+# localhost üzerinde çalışır; hedeflerin sonuçlarını hostvars'tan toplar.
+- name: Rapor satırlarını oluştur
+  ansible.builtin.set_fact:
+    mysqlreport_data: >-
+      {{ (groups['mysql_targets'] | default([]))
+         | mysqlreport_rows(hostvars, mysqlinv_skipped | default([]), mysqlreport_result_var) }}
+
+- name: Özet hesapla
+  ansible.builtin.set_fact:
+    mysqlreport_summary:
+      title: "{{ mysqlreport_title }}"
+      environments: "{{ mysqlinv_summary.selected_environments | default([]) }}"
+      total_targets: "{{ groups['mysql_targets'] | default([]) | length }}"
+      by_status: "{{ mysqlreport_data | mysqlreport_counts }}"
+      failed_servers: "{{ mysqlreport_data | rejectattr('status', 'in', ['OK', 'SKIPPED']) | map(attribute='server') | list }}"
+      # OK ama not içeren (socket fallback, port uyuşmazlığı) sunucular
+      warning_servers: "{{ mysqlreport_data | selectattr('status', 'eq', 'OK') | selectattr('detail') | map(attribute='server') | list }}"
+
+- name: Rapor tablosu
+  ansible.builtin.debug:
+    msg: "{{ (mysqlreport_data | mysqlreport_table).split('\n') }}"
+
+- name: Rapor özeti
+  ansible.builtin.debug:
+    var: mysqlreport_summary
+
+- name: Raporu AAP job artifact'ına yaz
+  ansible.builtin.set_stats:
+    data:
+      mysqlreport_summary: "{{ mysqlreport_summary }}"
+      mysqlreport_data: "{{ mysqlreport_data }}"
+    per_host: false
+
+- name: Başarısız sunucu varsa job'ı FAILED işaretle
+  ansible.builtin.fail:
+    msg: >-
+      {{ mysqlreport_summary.failed_servers | length }} sunucuda hata var:
+      {{ mysqlreport_summary.failed_servers | join(', ') }}. Ayrıntı yukarıdaki tabloda.
+  when:
+    - mysqlreport_fail_on_error | bool
+    - mysqlreport_summary.failed_servers | length > 0

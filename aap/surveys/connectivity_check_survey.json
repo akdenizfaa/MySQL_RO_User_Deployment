@@ -1,0 +1,72 @@
+{
+  "name": "MySQL Connectivity Check",
+  "description": "Faz 2 - SSH + MySQL root bağlantı testi ve durum raporu (değişiklik yapmaz)",
+  "spec": [
+    {
+      "question_name": "Ortam(lar)",
+      "question_description": "Hedeflenecek ortamlar (çoklu seçim)",
+      "variable": "target_environments",
+      "type": "multiselect",
+      "choices": "DEV\nTEST\nQA\nPROD",
+      "default": "TEST",
+      "required": true
+    },
+    {
+      "question_name": "Sunucu filtresi (opsiyonel)",
+      "question_description": "Virgülle ayrılmış ServerName listesi. BOŞ BIRAKIN = seçilen ortamdaki tüm aktif sunucular (tırnak yazmayın)",
+      "variable": "target_servers",
+      "type": "text",
+      "default": "",
+      "required": false,
+      "min": 0,
+      "max": 4000
+    },
+    {
+      "question_name": "MSSQL kullanıcısı",
+      "question_description": "PGARSQLTEM01,1453 / MysqlInventory",
+      "variable": "mssql_user",
+      "type": "text",
+      "default": "Sql_inventory_user",
+      "required": true,
+      "min": 1,
+      "max": 128
+    },
+    {
+      "question_name": "MSSQL şifresi",
+      "variable": "mssql_password",
+      "type": "password",
+      "default": "",
+      "required": true,
+      "min": 1,
+      "max": 256
+    },
+    {
+      "question_name": "MySQL admin kullanıcısı",
+      "variable": "mysql_admin_user",
+      "type": "text",
+      "default": "root",
+      "required": true,
+      "min": 1,
+      "max": 64
+    },
+    {
+      "question_name": "MySQL admin şifresi",
+      "question_description": "Sunucuya geçici 0600 dosya ile aktarılır, komut satırında görünmez, iş sonunda silinir",
+      "variable": "mysql_admin_password",
+      "type": "password",
+      "default": "",
+      "required": true,
+      "min": 1,
+      "max": 256
+    },
+    {
+      "question_name": "MySQL bağlantı yöntemi",
+      "question_description": "auto: önce TCP 127.0.0.1:<port>, auth/port hatasında socket | tcp: sadece TCP | socket: sadece socket",
+      "variable": "mysql_connect_method",
+      "type": "multiplechoice",
+      "choices": "auto\ntcp\nsocket",
+      "default": "auto",
+      "required": true
+    }
+  ]
+}

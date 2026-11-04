@@ -1,0 +1,24 @@
+---
+# MySQL admin hesabı. Şifre Survey'deki password tipli alandan gelir.
+mysql_admin_user: "root"
+mysql_admin_password: ""
+
+# Bağlantı yöntemi:
+#   tcp    : -h 127.0.0.1 -P <ListeningPort>
+#   socket : my.cnf'teki default socket (lokal)
+#   auto   : önce tcp; 1045 (auth) veya 2003 (port) hatasında socket dene
+# Neden auto: MySQL 8 kurulumlarında root çoğunlukla sadece 'root'@'localhost'
+# olarak tanımlıdır; skip_name_resolve=ON ise TCP 127.0.0.1 bağlantısı 1045 alır.
+mysql_connect_method: auto
+mysql_connect_timeout: 10
+
+# mysql client: önce login shell PATH'i, sonra bu yollar denenir.
+mysql_client_candidates:
+  - /usr/bin/mysql
+  - /usr/local/bin/mysql
+  - /usr/local/mysql/bin/mysql
+  - /opt/mysql/bin/mysql
+  - /usr/sbin/mysql
+
+# Remote geçici şifre dosyası dizini (mode 0600, task sonunda silinir)
+mysql_tmp_dir: /tmp

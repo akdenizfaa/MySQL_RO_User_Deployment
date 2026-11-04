@@ -30,10 +30,12 @@
   ansible.builtin.set_fact:
     mysqlinv_targets: "{{ _mysqlinv_selection.targets }}"
     mysqlinv_skipped: "{{ _mysqlinv_selection.skipped }}"
+    mysqlinv_not_found: "{{ _mysqlinv_selection.not_found }}"
     mysqlinv_summary:
       source: "{{ 'mock:' ~ mysqlinv_mock_file if mysqlinv_mock_file else mssql_host ~ ',' ~ mssql_port ~ '/' ~ mssql_db }}"
       selected_environments: "{{ target_environments | mysqlinv_envs }}"
       server_filter: "{{ target_servers | mysqlinv_list }}"
+      server_filter_not_found: "{{ _mysqlinv_selection.not_found }}"
       rows_read: "{{ mysqlinv_raw_rows | length }}"
       type_values_found: "{{ _mysqlinv_all | map(attribute='type_raw') | unique | sort }}"
       unmapped_type_values: "{{ _mysqlinv_all | selectattr('environment', 'eq', 'UNMAPPED') | map(attribute='type_raw') | unique | sort }}"
@@ -58,3 +60,15 @@
   loop_control:
     label: "{{ item.name }} ({{ item.environment }}) ssh={{ item.ip }} mysql_port={{ item.port }}"
   changed_when: false
+
+- name: Hedef bulunamazsa job'ı anlaşılır mesajla durdur
+  ansible.builtin.fail:
+    msg: >-
+      Seçilen kriterlere uyan hedef sunucu yok.
+      Ortam: {{ mysqlinv_summary.selected_environments }},
+      sunucu filtresi: {{ mysqlinv_summary.server_filter }},
+      envanterde olmayan filtre adları: {{ mysqlinv_summary.server_filter_not_found }},
+      elenen: {{ mysqlinv_summary.skipped_count }}.
+  when:
+    - mysqlinv_targets | length == 0
+    - mysqlinv_fail_on_no_targets | bool

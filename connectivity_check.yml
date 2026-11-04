@@ -1,0 +1,37 @@
+---
+# FAZ 2 - Bağlantı testi ve durum raporu. Hedeflerde DEĞİŞİKLİK YAPMAZ.
+#
+# Akış: MSSQL envanter (Faz 1) -> her hedefe SSH -> mysql client -> root ile
+#       SELECT VERSION() -> konsolide rapor.
+#
+# AAP:
+#   Credential : SSH:uxsqlteam (Machine)
+#   Survey     : target_environments, target_servers, mssql_user, mssql_password,
+#                mysql_admin_user, mysql_admin_password, mysql_connect_method
+
+- name: Envanteri oku
+  hosts: localhost
+  gather_facts: false
+  pre_tasks:
+    - name: MySQL admin şifresi survey'den gelmiş olmalı
+      ansible.builtin.assert:
+        that: mysql_admin_password | default('') | length > 0
+        fail_msg: "Survey'deki 'MySQL root şifresi' alanı boş (mysql_admin_password)."
+        quiet: true
+  roles:
+    - role: mysql_inventory
+
+- name: Hedeflere bağlan
+  hosts: mysql_targets
+  gather_facts: false
+  become: false          # dzdo/su kullanılmaz; uxsqlteam ile doğrudan çalışılır
+  roles:
+    - role: mysql_connectivity
+
+- name: Rapor
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: mysql_report
+      vars:
+        mysqlreport_title: "Faz 2 - MySQL bağlantı raporu"

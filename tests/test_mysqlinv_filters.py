@@ -81,3 +81,18 @@ def test_select_server_filter(rows):
 def test_count_by_env(rows):
     sel = f.mysqlinv_select(f.mysqlinv_normalize(rows, ENV_MAP), ["TEST", "QA"])
     assert f.mysqlinv_count_by_env(sel["targets"], ["TEST", "QA"]) == {"TEST": 2, "QA": 0}
+
+
+@pytest.mark.parametrize("raw", ['""', "''", '"" ', ' , ', None, ""])
+def test_list_ignores_empty_and_quote_residue(raw):
+    assert f.mysqlinv_list(raw) == []
+
+
+def test_list_strips_quotes_around_names():
+    assert f.mysqlinv_list('"gbarkt02", \'GBARKT04\'') == ["gbarkt02", "gbarkt04"]
+
+
+def test_select_reports_unknown_server_names(rows):
+    sel = f.mysqlinv_select(f.mysqlinv_normalize(rows, ENV_MAP), ["TEST"], "gbarkt02,yok01")
+    assert [t["name"] for t in sel["targets"]] == ["gbarkt02"]
+    assert sel["not_found"] == ["yok01"]
