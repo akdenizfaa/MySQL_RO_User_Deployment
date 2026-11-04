@@ -22,7 +22,7 @@ ansible.cfg
 collections/requirements.yml          # AAP project sync bunu otomatik kurar
 execution-environment/                # ansible-builder tanımı (pymssql)
 inventory/localhost.yml               # sadece controller; hedefler runtime'da eklenir
-playbooks/inventory_read.yml          # FAZ 1 giriş noktası
+inventory_read.yml                    # FAZ 1 giriş noktası (roles/ ile yan yana olmalı)
 roles/mysql_inventory/                # MSSQL okuma + ortam eşleme + add_host
   filter_plugins/mysqlinv.py          # normalize/seçim mantığı (unit-test'li)
 aap/surveys/                          # Survey spec (JSON)
@@ -47,7 +47,7 @@ görebilirsiniz. Ekibinizde zaten `pymssql` içeren bir EE varsa onu kullanın.
 3. **Inventory**: `localhost` hostu içeren bir inventory (veya Source olarak
    `inventory/localhost.yml`).
 4. **Job Template**: `MySQL - Inventory Read`
-   - Playbook: `playbooks/inventory_read.yml`
+   - Playbook: `inventory_read.yml`
    - Execution Environment: 1. adımdaki EE
    - Credentials: Faz 1'de gerekmiyor (MSSQL şifresi survey'den gelir)
 5. **Survey**: `aap/surveys/inventory_read_survey.json` içindeki 4 soru
@@ -55,6 +55,12 @@ görebilirsiniz. Ekibinizde zaten `pymssql` içeren bir EE varsa onu kullanın.
    Survey'i **Enable** etmeyi unutmayın.
 6. Çalıştırın. Çıktıda `mysqlinv_summary` (okunan satır, bulunan Type değerleri,
    ortam başına hedef sayısı), `mysqlinv_skipped` (elenenler + neden) ve hedef listesi görünür.
+
+## Sorun giderme
+
+- **`the role 'mysql_inventory' was not found`**: Playbook'lar repo kökünde
+  tutulur; Ansible rolleri playbook'un yanındaki `roles/` klasöründe arar. Bu düzen
+  AAP'nin `ansible.cfg`'yi okuyup okumamasından bağımsız çalışır.
 
 ## Ortam eşlemesi
 
@@ -74,7 +80,7 @@ Eşlenmeyen değerler raporda `unmapped_type_values` olarak listelenir.
 
 ```bash
 python3 -m pytest -q tests/
-ansible-playbook playbooks/inventory_read.yml \
+ansible-playbook inventory_read.yml \
   -e '{"target_environments":["TEST","PROD"]}' \
   -e mysqlinv_mock_file=$PWD/tests/fixtures/inventory_sample.json
 ```
