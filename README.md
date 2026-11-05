@@ -18,27 +18,48 @@ AAP (EE container) ──SSH:22 (uxsqlteam)──► MySQL sunucusu (ListeningIP
 ## Yapı
 
 ```
-ansible.cfg
-collections/requirements.yml          # AAP project sync bunu otomatik kurar
-execution-environment/                # ansible-builder tanımı (pymssql)
-inventory/localhost.yml               # sadece controller; hedefler runtime'da eklenir
-inventory_read.yml                    # FAZ 1: envanter keşfi
-connectivity_check.yml                # FAZ 2: SSH + MySQL bağlantı testi ve rapor
-user_check.yml                        # FAZ 3: kullanıcı/şifre/yetki kontrolü + native password audit
-user_deploy.yml                       # FAZ 4: oluştur / yetki ver / şifre güncelle (+ check mode)
-roles/mysql_inventory/                # MSSQL okuma + ortam eşleme + add_host
-  filter_plugins/mysqlinv.py
-roles/mysql_connectivity/             # host başına SSH/client/MySQL testi
-  filter_plugins/mysqlconn.py         # durum sınıflandırma + option file üretimi
-roles/mysql_user_check/               # hesap okuma, hash karşılaştırma, yetki farkı
-  filter_plugins/mysqluser.py
-roles/mysql_user_apply/               # planı uygula (stdin), sonuç ayrıştırma, doğrulama
-  filter_plugins/mysqlapply.py
-roles/mysql_report/                   # konsolide tablo + özet + set_stats
-  filter_plugins/mysqlreport.py
-aap/surveys/                          # Survey spec (JSON)
-tests/                                # pytest + mock envanter
+inventory_read.yml        FAZ 1: envanter keşfi
+connectivity_check.yml    FAZ 2: bağlantı testi                    (değişiklik yapmaz)
+user_check.yml            FAZ 3: kullanıcı/şifre/yetki kontrolü     (değişiklik yapmaz)
+user_deploy.yml           FAZ 4: oluştur / yetki ver / şifre güncelle (+ Check modu)
+
+roles/mysql_inventory/    MSSQL okuma, ortam eşleme, add_host
+roles/mysql_host/         host başına TEK task: action_plugins/mysql_host_run.py
+roles/mysql_report/       SONUÇ RAPORU + job artifact
+roles/mysql_connectivity/filter_plugins/mysqlconn.py   bağlantı sınıflandırma
+roles/mysql_user_check/filter_plugins/mysqluser.py     hash, yetki, politika, SQL planı
+roles/mysql_user_apply/filter_plugins/mysqlapply.py    uygulama sonucu ayrıştırma
+aap/surveys/              survey spec'leri
+tests/                    pytest (104 test) + lab fixture'ları
 ```
+
+## Çıktı ve dayanıklılık
+
+- **Host başına tek satır:** `ok: [sunucu]` (değişiklik yok) veya `changed: [sunucu]`.
+  Tüm adımlar (SSH, client, bağlantı, kontrol, uygulama, doğrulama) tek task'ta.
+- **Bir sunucu diğerlerini durdurmaz:** SSH erişilemezliği, kimlik hatası, SQL hatası,
+  işlem sırasında bağlantı kopması ve beklenmeyen hatalar yakalanır ve rapora yazılır;
+  host hiçbir zaman fail/unreachable olmaz. Tüm sunucular hata verse bile rapor çıkar.
+- **SONUÇ RAPORU** (job sonunda): sunucular sonuçlarına göre gruplanır, aynı sonucu
+  alanlar tek satırda toplanır:
+
+| Bölüm | Anlamı | Job'ı FAILED yapar |
+|---|---|---|
+| HATA | Bağlanılamadı / SQL hatası / işlem yarıda kaldı | Evet |
+| YAPILAMADI | Şifre politikası, port uyuşmazlığı - aksiyon gerekiyor | Evet |
+| DEĞİŞİKLİK YAPILDI | Ne yapıldığı + doğrulama sonucu | |
+| PLANLANAN | Check modunda yapılacaklar | |
+| İŞLEM GEREKİYOR | Faz 3'te tespit edilen eksikler | |
+| ŞİFRE FARKLI | `report` seçildiği için değiştirilmedi | |
+| REPLİKA / SECONDARY | read_only; primary'den replike olur | |
+| UYGUN | İşlem gerekmedi | |
+| ATLANDI | Envanterde pasif vb. | |
+| DİKKAT | Fazla yetki, ek hesaplar, socket fallback, native password audit özeti | |
+
+- Ayrıntılar AAP job'ında **Details > Artifacts**: `mysqlreport_hosts` (sunucu bazlı),
+  `mysqlreport_apply` (ifade bazlı, şifre maskeli), `mysqlreport_native` (native hesap listesi).
+- Job, rapor basıldıktan sonra HATA/YAPILAMADI varsa FAILED olur
+  (`mysqlreport_fail_on_error: false` ile kapatılabilir).
 
 ## EE (Execution Environment) nedir?
 
@@ -156,8 +177,10 @@ Job Template: `MySQL - User Deploy`
 | SQL hatası | İlk hatada durur; ifade bazlı `APPLIED` / `FAILED` / `NOT_RUN`, job FAILED |
 | Doğrulama | Uygulamadan sonra Faz 3 kontrolü tekrar çalışır, `post` sütununa yazılır |
 
-Güvenlik: hedef şifre SQL'e yalnızca uygulama anında, `no_log` task'ın **stdin**'inde
-eklenir (komut satırında/`ps`'te görünmez); rapordaki SQL'de `'********'` görünür.
+Güvenlik: şifreler komut satırına hiç yazılmaz (`ps`'te görünmez). Admin şifresi SSH
+stdin ile 0600 geçici option file'a yazılır ve iş sonunda silinir; hedef şifreyi içeren
+SQL mysql'e doğrudan SSH stdin ile verilir. Hedefte Python ve sftp/scp gerekmez.
+Raporda SQL `'********'` ile maskelidir.
 MySQL binlog/general log'a `CREATE/ALTER USER` şifreleri hash'li yazılır.
 
 **InnoDB Cluster / replikasyon:** Primary üzerindeki değişiklik secondary'lere replike

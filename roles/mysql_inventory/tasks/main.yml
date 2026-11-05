@@ -1,74 +1,66 @@
 ---
 # Çıktılar:
-#   mysqlinv_targets   : bağlanılacak sunucular (list of dict)
-#   mysqlinv_skipped   : elenenler + neden
-#   mysqlinv_summary   : rapor özeti
-#   group 'mysql_targets' ve 'env_<ENV>' : add_host ile oluşturulan gruplar
+#   mysqlinv_targets / mysqlinv_skipped / mysqlinv_summary
+#   group 'mysql_targets' ve 'env_<ENV>' (add_host)
+# Log sade tutulur: okuma 1-2 task, seçim 1 task, gruplama host başına 1 kısa satır.
 
-- name: Survey girdisini doğrula (ortam seçimi)
+- name: Survey ortam seçimini doğrula
   ansible.builtin.assert:
-    that:
-      - (target_environments | mysqlinv_envs | length) > 0
+    that: (target_environments | mysqlinv_envs | length) > 0
     fail_msg: "En az bir ortam seçilmeli: DEV, TEST, QA, PROD"
     quiet: true
 
-- name: Satırları kaynaktan oku
-  ansible.builtin.include_tasks:
-    file: "{{ 'fetch_mock.yml' if (mysqlinv_mock_file | length > 0) else 'fetch_mssql.yml' }}"
+- name: MSSQL envanterini oku
+  ansible.builtin.include_tasks: fetch_mssql.yml
+  when: mysqlinv_mock_file | length == 0
 
-- name: Satırları normalize et
+- name: Mock envanteri oku (test)
   ansible.builtin.set_fact:
-    _mysqlinv_all: >-
-      {{ mysqlinv_raw_rows
-         | mysqlinv_normalize(mysqlinv_env_type_map, mysqlinv_default_port) }}
+    mysqlinv_raw_rows: "{{ lookup('ansible.builtin.file', mysqlinv_mock_file) | from_json }}"
+  when: mysqlinv_mock_file | length > 0
 
-- name: Hedefleri seç
+- name: Hedef sunucuları belirle
   ansible.builtin.set_fact:
-    _mysqlinv_selection: "{{ _mysqlinv_all | mysqlinv_select(target_environments, target_servers) }}"
-
-- name: Sonuçları yayınla
-  ansible.builtin.set_fact:
-    mysqlinv_targets: "{{ _mysqlinv_selection.targets }}"
-    mysqlinv_skipped: "{{ _mysqlinv_selection.skipped }}"
-    mysqlinv_not_found: "{{ _mysqlinv_selection.not_found }}"
+    mysqlinv_targets: "{{ _sel.targets }}"
+    mysqlinv_skipped: "{{ _sel.skipped }}"
+    mysqlinv_not_found: "{{ _sel.not_found }}"
     mysqlinv_summary:
       source: "{{ 'mock:' ~ mysqlinv_mock_file if mysqlinv_mock_file else mssql_host ~ ',' ~ mssql_port ~ '/' ~ mssql_db }}"
       selected_environments: "{{ target_environments | mysqlinv_envs }}"
       server_filter: "{{ target_servers | mysqlinv_list }}"
-      server_filter_not_found: "{{ _mysqlinv_selection.not_found }}"
+      server_filter_not_found: "{{ _sel.not_found }}"
       rows_read: "{{ mysqlinv_raw_rows | length }}"
-      type_values_found: "{{ _mysqlinv_all | map(attribute='type_raw') | unique | sort }}"
-      unmapped_type_values: "{{ _mysqlinv_all | selectattr('environment', 'eq', 'UNMAPPED') | map(attribute='type_raw') | unique | sort }}"
-      target_count: "{{ _mysqlinv_selection.targets | length }}"
-      skipped_count: "{{ _mysqlinv_selection.skipped | length }}"
-      targets_per_env: "{{ _mysqlinv_selection.targets | mysqlinv_count_by_env(target_environments) }}"
+      type_values_found: "{{ _all | map(attribute='type_raw') | unique | sort }}"
+      unmapped_type_values: "{{ _all | selectattr('environment', 'eq', 'UNMAPPED') | map(attribute='type_raw') | unique | sort }}"
+      target_count: "{{ _sel.targets | length }}"
+      skipped_count: "{{ _sel.skipped | length }}"
+      targets_per_env: "{{ _sel.targets | mysqlinv_count_by_env(target_environments) }}"
+  vars:
+    _all: "{{ mysqlinv_raw_rows | mysqlinv_normalize(mysqlinv_env_type_map, mysqlinv_default_port) }}"
+    _sel: "{{ _all | mysqlinv_select(target_environments, target_servers) }}"
 
-- name: Hedefleri dinamik gruplara ekle
-  ansible.builtin.add_host:
-    name: "{{ item.name }}"
-    groups:
-      - mysql_targets
-      - "env_{{ item.environment }}"
-    # SSH ile ListeningIP'ye bağlanılır (AAP -> MySQL portu kapalı).
-    # SSH kullanıcısı/anahtarı ve dzdo yetki yükseltme AAP Machine credential'dan gelir.
-    ansible_host: "{{ item.ip }}"
-    ansible_port: "{{ mysqlinv_ssh_port }}"
-    mysql_port: "{{ item.port }}"        # MySQL portu (sunucu üzerinde, lokal bağlantı için)
-    mysql_env: "{{ item.environment }}"
-    mysql_fqdn: "{{ item.fqdn }}"        # sadece rapor amaçlı
-  loop: "{{ mysqlinv_targets }}"
-  loop_control:
-    label: "{{ item.name }} ({{ item.environment }}) ssh={{ item.ip }} mysql_port={{ item.port }}"
-  changed_when: false
-
-- name: Hedef bulunamazsa job'ı anlaşılır mesajla durdur
+- name: Hedef bulunamazsa durdur
   ansible.builtin.fail:
     msg: >-
-      Seçilen kriterlere uyan hedef sunucu yok.
-      Ortam: {{ mysqlinv_summary.selected_environments }},
+      Seçilen kriterlere uyan hedef sunucu yok. Ortam: {{ mysqlinv_summary.selected_environments }},
       sunucu filtresi: {{ mysqlinv_summary.server_filter }},
       envanterde olmayan filtre adları: {{ mysqlinv_summary.server_filter_not_found }},
       elenen: {{ mysqlinv_summary.skipped_count }}.
   when:
     - mysqlinv_targets | length == 0
     - mysqlinv_fail_on_no_targets | bool
+
+- name: Hedefleri gruplara ekle
+  ansible.builtin.add_host:
+    name: "{{ item.name }}"
+    groups: [mysql_targets, "env_{{ item.environment }}"]
+    # SSH ile ListeningIP'ye. Kullanıcı/şifre AAP Machine credential'dan (SSH:uxsqlteam).
+    ansible_host: "{{ item.ip }}"
+    ansible_port: "{{ mysqlinv_ssh_port }}"
+    mysql_port: "{{ item.port }}"
+    mysql_env: "{{ item.environment }}"
+    mysql_fqdn: "{{ item.fqdn }}"
+  loop: "{{ mysqlinv_targets }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false

@@ -1,12 +1,7 @@
 ---
-mysqlreport_title: "MySQL bağlantı raporu"
-mysqlreport_result_var: mysqlconn
-# OK ve SKIPPED dışında bir durum varsa job FAILED olsun (AAP'de görünür olsun).
-# Rapor her durumda önce basılır.
+mysqlreport_title: "MySQL raporu"
+# connect (Faz 2) | check (Faz 3) | deploy (Faz 4)
+mysqlreport_phase: connect
+# HATA veya YAPILAMADI kategorisinde sunucu varsa rapordan SONRA job FAILED olsun.
+# Diğer sunucular her durumda işlenir; bu sadece AAP'deki job durumunu belirler.
 mysqlreport_fail_on_error: true
-# Faz 3 hesap tablosu + native password audit
-mysqlreport_include_accounts: false
-# Faz 4 ifade bazlı uygulama tablosu
-mysqlreport_include_apply: false
-# Hesap tablosu sütunları (Faz 4'te apply/post dolu, Faz 3'te '-'/boş)
-mysqlreport_account_columns: [server, environment, account, status, plugin, password, missing, extra, flags, planned, apply, post]

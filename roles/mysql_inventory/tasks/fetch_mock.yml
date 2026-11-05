@@ -1,5 +1,0 @@
----
-# Sadece test/geliştirme: MSSQL'e gitmeden aynı akışı doğrulamak için.
-- name: Mock envanter dosyasını oku
-  ansible.builtin.set_fact:
-    mysqlinv_raw_rows: "{{ lookup('ansible.builtin.file', mysqlinv_mock_file) | from_json }}"

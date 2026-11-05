@@ -72,3 +72,12 @@ Her faz sonunda onay alınmadan sonraki faza geçilmez.
 25. **Şifresi aynı native hesap**: `update` modunda yalnızca hedef kullanıcı için
     `ALTER USER ... IDENTIFIED WITH caching_sha2_password BY <aynı şifre>`. Diğer native
     hesaplar kapsam dışı (kullanıcı kararı).
+26. **Host başına tek task (action plugin `mysql_host_run`)**: log sadeliği ve dayanıklılık.
+    Ansible'da bir play'deki tüm host'lar fail olursa sonraki play (rapor) çalışmaz; plugin
+    hiçbir koşulda fail/unreachable döndürmez, her hata sonuca yazılır. Mantık değişmedi
+    (aynı filtreler), yalnızca orkestrasyon taşındı. Hedefte Python gerekmez.
+27. **Dosya transferi yerine SSH stdin**: sftp/scp bağımlılığı ve uyarıları yok.
+28. **SSH hata metni**: no_log, ssh eklentisinin hata metnini maskeler; yalnızca şifre içermeyen
+    ilk bağlantı denemesinde no_log geçici kapatılır.
+29. **Rapor**: kategoriler + aynı sonucu alan sunucuların gruplanması; ayrıntı artifact'ta.
+    Lab: 5 sunucuda log 548 -> 114 satır (çoğu rapor).

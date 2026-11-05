@@ -1,39 +1,31 @@
 ---
-# FAZ 3 - Kullanıcı kontrolü ve audit raporu. Hedeflerde DEĞİŞİKLİK YAPMAZ.
-#
-# Akış: girdi doğrulama -> MSSQL envanter -> bağlantı testi (Faz 2) ->
-#       hesap/şifre/yetki kontrolü -> native password audit -> rapor.
-#
-# Hedef kullanıcının şifresi MySQL sunucularına GÖNDERİLMEZ: mysql.user'daki
-# hash okunur ve AAP içinde karşılaştırılır (mimari karar A).
-#
-# AAP:
-#   Credential : SSH:uxsqlteam (Machine)
-#   Survey     : aap/surveys/user_check_survey.json
+# FAZ 3 - Kullanıcı kontrolü ve audit. Hedeflerde DEĞİŞİKLİK YAPMAZ.
+# Hedef kullanıcının şifresi sunuculara gönderilmez (hash AAP içinde karşılaştırılır).
+# Credential: SSH:uxsqlteam | Survey: aap/surveys/user_check_survey.json
 
-- name: Girdileri doğrula ve envanteri oku
+- name: Girdiler ve envanter
   hosts: localhost
   gather_facts: false
   pre_tasks:
-    - name: MySQL admin şifresi survey'den gelmiş olmalı
+    - name: MySQL admin şifresi girilmiş olmalı
       ansible.builtin.assert:
         that: mysql_admin_password | default('') | length > 0
-        fail_msg: "Survey'deki 'MySQL admin şifresi' alanı boş (mysql_admin_password)."
+        fail_msg: "Survey'deki 'MySQL admin şifresi' alanı boş."
         quiet: true
-    - name: Hedef kullanıcı girdileri
+    - name: Survey girdileri
       ansible.builtin.include_role:
         name: mysql_user_check
         tasks_from: validate.yml
   roles:
-    - role: mysql_inventory
+    - mysql_inventory
 
-- name: Bağlan ve hesapları kontrol et
+- name: Sunucular
   hosts: mysql_targets
   gather_facts: false
   become: false
   roles:
-    - role: mysql_connectivity
-    - role: mysql_user_check
+    - role: mysql_host
+      vars: {mysql_host_mode: check}
 
 - name: Rapor
   hosts: localhost
@@ -41,6 +33,5 @@
   roles:
     - role: mysql_report
       vars:
-        mysqlreport_title: "Faz 3 - MySQL kullanıcı kontrol ve audit raporu"
-        mysqlreport_include_accounts: true
-        mysqlreport_account_columns: [server, environment, account, status, plugin, password, missing, extra, flags, planned]
+        mysqlreport_phase: check
+        mysqlreport_title: "MySQL kullanıcı kontrol raporu"

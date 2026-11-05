@@ -6,9 +6,7 @@ import pytest
 
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(HERE, "..", "roles", "mysql_connectivity", "filter_plugins"))
-sys.path.insert(0, os.path.join(HERE, "..", "roles", "mysql_report", "filter_plugins"))
 import mysqlconn as c  # noqa: E402
-import mysqlreport as r  # noqa: E402
 
 SSH_OK = {"rc": 0, "stdout": "SSH_OK\r\n"}
 CLIENT_OK = {"rc": 0, "stdout": "/usr/bin/mysql"}
@@ -102,20 +100,6 @@ def test_cnf_escaping_roundtrip(pw):
 def test_cnf_rejects_newline():
     with pytest.raises(ValueError):
         c.mysqlconn_cnf("a\nb")
-
-
-def test_report_rows_counts_and_table():
-    hostvars = {
-        "s1": {"mysql_env": "TEST", "ansible_host": "10.0.0.1", "mysql_port": 3316,
-               "mysqlconn": {"status": "OK", "method": "tcp", "version": "8.0.36", "detail": ""}},
-        "s2": {"mysql_env": "PROD", "ansible_host": "10.0.0.2", "mysql_port": 3316},  # sonuç yok
-    }
-    rows = r.mysqlreport_rows(["s2", "s1"], hostvars, [{"name": "s3", "environment": "TEST", "reason": "isActive=0"}])
-    assert [x["server"] for x in rows] == ["s1", "s2", "s3"]
-    assert [x["status"] for x in rows] == ["OK", "ERROR", "SKIPPED"]
-    assert r.mysqlreport_counts(rows) == {"ERROR": 1, "OK": 1, "SKIPPED": 1}
-    table = r.mysqlreport_table(rows).splitlines()
-    assert table[0].startswith("SERVER") and len(table) == 5
 
 
 def test_read_only_detected():

@@ -1,18 +1,8 @@
 ---
-# localhost'ta bir kez çalışır (survey girdisi doğrulama).
-# Şifrenin kendisi değil yalnızca dolu olup olmadığı gönderilir; böylece no_log
-# gerekmez ve hata mesajı kullanıcıya görünür.
-- name: Hedef kullanıcı girdilerini doğrula
+# localhost'ta bir kez çalışır (survey girdisi doğrulama). Girdiler raporun başlığında görünür.
+# Şifrenin kendisi değil yalnızca dolu olup olmadığı gönderilir; hata mesajı görünür kalır.
+- name: Survey girdilerini doğrula
   ansible.builtin.set_fact:
     mysqluser_inputs: >-
       {{ target_user | mysqluser_validate(target_user_password | default('') | length > 0,
                                           target_user_hosts, privilege_sets, password_mismatch_action) }}
-
-- name: Doğrulanan girdiler
-  ansible.builtin.debug:
-    msg:
-      user: "{{ mysqluser_inputs.user }}"
-      hosts: "{{ mysqluser_inputs.hosts }}"
-      privilege_sets: "{{ mysqluser_inputs.privilege_sets }}"
-      desired: "{{ mysqluser_inputs.privilege_sets | mysqluser_desired }}"
-      password_mismatch_action: "{{ mysqluser_inputs.mismatch_action }}"

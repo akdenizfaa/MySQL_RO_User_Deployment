@@ -1,106 +1,36 @@
 ---
-# localhost üzerinde çalışır; hedeflerin sonuçlarını hostvars'tan toplar.
-- name: Rapor satırlarını oluştur
+# localhost'ta çalışır; host sonuçlarını hostvars'tan toplar.
+- name: Raporu hazırla
   ansible.builtin.set_fact:
-    mysqlreport_data: >-
-      {{ (groups['mysql_targets'] | default([]))
-         | mysqlreport_rows(hostvars, mysqlinv_skipped | default([]), mysqlreport_result_var) }}
+    mysqlreport: >-
+      {{ groups['mysql_targets'] | default([])
+         | mysqlreport_build(hostvars, mysqlinv_skipped | default([]), {
+             'phase': mysqlreport_phase,
+             'title': mysqlreport_title,
+             'check_mode': ansible_check_mode,
+             'environments': mysqlinv_summary.selected_environments | default([]),
+             'inputs': mysqluser_inputs | default({}) }) }}
 
-- name: Özet hesapla
-  ansible.builtin.set_fact:
-    mysqlreport_summary:
-      title: "{{ mysqlreport_title }}"
-      environments: "{{ mysqlinv_summary.selected_environments | default([]) }}"
-      total_targets: "{{ groups['mysql_targets'] | default([]) | length }}"
-      by_status: "{{ mysqlreport_data | mysqlreport_counts }}"
-      failed_servers: "{{ mysqlreport_data | rejectattr('status', 'in', ['OK', 'SKIPPED']) | map(attribute='server') | list }}"
-      # OK ama not içeren (socket fallback, port uyuşmazlığı) sunucular
-      warning_servers: "{{ mysqlreport_data | selectattr('status', 'eq', 'OK') | selectattr('detail') | map(attribute='server') | list }}"
-
-- name: Rapor tablosu
+- name: SONUÇ RAPORU
   ansible.builtin.debug:
-    msg: "{{ mysqlreport_data | mysqlreport_lines }}"
+    msg: "{{ mysqlreport.lines }}"
 
-- name: Rapor özeti
-  ansible.builtin.debug:
-    var: mysqlreport_summary
-
-- name: Hesap raporu (Faz 3)
-  when: mysqlreport_include_accounts | bool
-  block:
-    - name: Hesap satırlarını oluştur
-      ansible.builtin.set_fact:
-        mysqlreport_accounts: "{{ groups['mysql_targets'] | default([]) | mysqlreport_account_rows(hostvars) }}"
-        mysqlreport_native: "{{ groups['mysql_targets'] | default([]) | mysqlreport_native_rows(hostvars) }}"
-
-    - name: Hesap tablosu
-      ansible.builtin.debug:
-        msg: >-
-          {{ mysqlreport_accounts | mysqlreport_lines(mysqlreport_account_columns) }}
-
-    - name: Audit - mysql_native_password kullanan hesaplar (düzeltilmeli)
-      ansible.builtin.debug:
-        msg: "{{ mysqlreport_native | mysqlreport_lines(['server', 'environment', 'account', 'category', 'issue']) }}"
-
-    - name: Hesap özetini hesapla
-      ansible.builtin.set_fact:
-        mysqlreport_summary: >-
-          {{ mysqlreport_summary | combine({
-               'accounts_by_status': mysqlreport_accounts | mysqlreport_counts,
-               'native_password_account_count': mysqlreport_native | length,
-               'native_password_by_category': mysqlreport_native | mysqlreport_count_by('category'),
-               'password_policy_blocked_servers': mysqlreport_accounts
-                   | selectattr('flags', 'search', 'ŞİFRE_POLİTİKASI_UYGUN_DEĞİL')
-                   | map(attribute='server') | unique | list,
-               'native_password_servers': mysqlreport_native | map(attribute='server') | unique | list,
-               'failed_servers': (mysqlreport_summary.failed_servers
-                                  + (mysqlreport_accounts | selectattr('status', 'eq', 'QUERY_ERROR')
-                                     | map(attribute='server') | list)) | unique | list }) }}
-
-    - name: Hesap özeti
-      ansible.builtin.debug:
-        var: mysqlreport_summary
-
-- name: Uygulama raporu (Faz 4)
-  when: mysqlreport_include_apply | bool
-  block:
-    - name: İfade bazlı sonuçları oluştur
-      ansible.builtin.set_fact:
-        mysqlreport_apply: "{{ groups['mysql_targets'] | default([]) | mysqlreport_apply_rows(hostvars) }}"
-
-    - name: Uygulama tablosu (SQL maskeli)
-      ansible.builtin.debug:
-        msg: "{{ mysqlreport_apply | mysqlreport_lines(['server', 'environment', 'account', 'statement', 'result', 'error']) }}"
-
-    - name: Uygulama özetini ekle
-      ansible.builtin.set_fact:
-        mysqlreport_summary: >-
-          {{ mysqlreport_summary | combine({
-               'mode': 'CHECK' if ansible_check_mode else 'RUN',
-               'statements_by_result': mysqlreport_apply | mysqlreport_count_by('result'),
-               'failed_servers': (mysqlreport_summary.failed_servers
-                                  + (mysqlreport_apply | selectattr('result', 'in', ['FAILED', 'UNKNOWN', 'SKIPPED_PASSWORD_POLICY'])
-                                     | map(attribute='server') | list)) | unique | list }) }}
-
-    - name: Uygulama özeti
-      ansible.builtin.debug:
-        var: mysqlreport_summary
-
-- name: Raporu AAP job artifact'ına yaz
+# Ayrıntılar (host bazlı mesaj, ifade bazlı sonuç, native hesap listesi) artifact'ta
+- name: Ayrıntıları AAP job artifact'ına yaz
   ansible.builtin.set_stats:
     data:
-      mysqlreport_summary: "{{ mysqlreport_summary }}"
-      mysqlreport_data: "{{ mysqlreport_data }}"
-      mysqlreport_accounts: "{{ mysqlreport_accounts | default([]) }}"
-      mysqlreport_native: "{{ mysqlreport_native | default([]) }}"
-      mysqlreport_apply: "{{ mysqlreport_apply | default([]) }}"
+      mysqlreport_summary: "{{ mysqlreport.summary }}"
+      mysqlreport_hosts: "{{ mysqlreport.hosts }}"
+      mysqlreport_apply: "{{ mysqlreport.apply }}"
+      mysqlreport_native: "{{ mysqlreport.native }}"
     per_host: false
 
-- name: Başarısız sunucu varsa job'ı FAILED işaretle
+- name: Job durumu
   ansible.builtin.fail:
     msg: >-
-      {{ mysqlreport_summary.failed_servers | length }} sunucuda hata var:
-      {{ mysqlreport_summary.failed_servers | join(', ') }}. Ayrıntı yukarıdaki tabloda.
+      {{ mysqlreport.summary.failed_servers | length }}/{{ groups['mysql_targets'] | default([]) | length }}
+      sunucuda hata veya yapılamayan işlem var: {{ mysqlreport.summary.failed_servers | join(', ') }}.
+      {{ 'Diğer sunucular işlendi. ' if (mysqlreport.summary.failed_servers | length) < (groups['mysql_targets'] | default([]) | length) else '' }}Ayrıntı: SONUÇ RAPORU.
   when:
     - mysqlreport_fail_on_error | bool
-    - mysqlreport_summary.failed_servers | length > 0
+    - mysqlreport.summary.failed_servers | length > 0

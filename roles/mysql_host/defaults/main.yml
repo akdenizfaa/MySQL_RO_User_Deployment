@@ -1,0 +1,22 @@
+---
+# mode: connect (Faz 2) | check (Faz 3) | deploy (Faz 4)
+mysql_host_mode: connect
+
+# MySQL admin hesabı. Şifre Survey'deki password tipli alandan gelir.
+mysql_admin_user: "root"
+mysql_admin_password: ""
+
+# tcp: -h 127.0.0.1 -P <ListeningPort> | socket | auto: önce tcp, 1045/2002/2003/2013'te socket
+mysql_connect_method: auto
+mysql_connect_timeout: 10
+
+# mysql client: önce login shell PATH'i, sonra bu yollar
+mysql_client_candidates:
+  - /usr/bin/mysql
+  - /usr/local/bin/mysql
+  - /usr/local/mysql/bin/mysql
+  - /opt/mysql/bin/mysql
+  - /usr/sbin/mysql
+
+# Uzak geçici dosyalar (0600, iş sonunda silinir)
+mysql_tmp_dir: /tmp

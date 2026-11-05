@@ -10,9 +10,7 @@ import pytest
 
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(HERE, "..", "roles", "mysql_user_check", "filter_plugins"))
-sys.path.insert(0, os.path.join(HERE, "..", "roles", "mysql_report", "filter_plugins"))
 import mysqluser as u  # noqa: E402
-import mysqlreport as r  # noqa: E402
 
 with open(os.path.join(HERE, "fixtures", "mysql8_hash_vectors.json"), encoding="utf-8") as fh:
     VECTORS = json.load(fh)
@@ -194,20 +192,6 @@ def test_render_inserts_escaped_password_only_at_apply():
 
 
 # ---------------------------------------------------------------- report
-def test_report_account_and_native_rows():
-    hv = {
-        "s1": {"mysql_env": "TEST", "mysqluser": {"status": "CHECKED", "accounts": [
-            {"account": "app@%", "status": "NOT_EXISTS", "plugin": "", "password": "",
-             "missing_privileges": ["SELECT"], "flags": [], "planned_actions": ["CREATE USER"]}],
-            "native_password_accounts": ["legacy@localhost"]}},
-        "s2": {"mysql_env": "PROD", "mysqluser": {"status": "SKIPPED_CONNECTION",
-                                                 "detail": "Bağlantı durumu SSH_UNREACHABLE"}},
-    }
-    rows = r.mysqlreport_account_rows(["s2", "s1"], hv)
-    assert [(x["server"], x["status"]) for x in rows] == [("s1", "NOT_EXISTS"), ("s2", "SKIPPED_CONNECTION")]
-    assert rows[1]["planned"] == "Bağlantı durumu SSH_UNREACHABLE"
-    assert r.mysqlreport_native_rows(["s1", "s2"], hv)[0]["account"] == "legacy@localhost"
-    assert r.mysqlreport_lines(rows, ["server", "status"])[0].startswith("SERVER")
 
 
 # ---------------------------------------------------------------- şifre politikası

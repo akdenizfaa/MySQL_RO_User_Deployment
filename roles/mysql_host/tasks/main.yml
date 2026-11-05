@@ -1,0 +1,18 @@
+---
+# Host başına TEK task. Asla fail/unreachable döndürmez; tüm sonuç ve hatalar
+# host fact'lerine yazılır (mysqlconn, mysqluser, mysqluser_before, mysqlapply,
+# mysqlhost_error) ve rapor play'inde toplanır.
+# no_log: argümanlarda şifreler var. Ayrıntı raporda.
+- name: MySQL işlemleri
+  mysql_host_run:
+    mode: "{{ mysql_host_mode }}"
+    port: "{{ mysql_port }}"
+    admin_user: "{{ mysql_admin_user }}"
+    admin_password: "{{ mysql_admin_password }}"
+    connect_method: "{{ mysql_connect_method }}"
+    connect_timeout: "{{ mysql_connect_timeout }}"
+    client_candidates: "{{ mysql_client_candidates }}"
+    tmp_dir: "{{ mysql_tmp_dir }}"
+    inputs: "{{ hostvars['localhost']['mysqluser_inputs'] | default(omit) }}"
+    target_password: "{{ target_user_password | default(omit) }}"
+  no_log: true

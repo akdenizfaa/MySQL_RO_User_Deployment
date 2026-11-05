@@ -1,13 +1,4 @@
 ---
-- name: MSSQL bağlantı bilgilerinin geldiğini doğrula
-  ansible.builtin.assert:
-    that:
-      - mssql_host | length > 0
-      - mssql_user | length > 0
-      - mssql_password | length > 0
-    fail_msg: "MSSQL şifresi boş. Survey'deki 'MSSQL şifresi' alanını doldurun (mssql_password)."
-    quiet: true
-
 - name: MSSQL envanter tablosunu oku (salt okunur SELECT)
   community.general.mssql_script:
     login_host: "{{ mssql_host }}"
@@ -18,9 +9,9 @@
     script: "{{ mysqlinv_query }}"
     output: dict
   register: _mysqlinv_mssql
-  check_mode: false     # SELECT; check mode'da da çalışmalı yoksa hedef listesi boş kalır
-  changed_when: false   # modül her zaman changed=true döner, okuma için yanıltıcı
+  check_mode: false     # SELECT; check mode'da da çalışmalı
+  changed_when: false
 
-- name: Ham satırları ayıkla
+- name: MSSQL satırlarını ayıkla
   ansible.builtin.set_fact:
     mysqlinv_raw_rows: "{{ (_mysqlinv_mssql.query_results_dict | default([[[]]]))[0][0] | default([]) }}"
